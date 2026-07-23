@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+pandas
+openpyxl
+speechrecognition
+pyaudio
+pyttsx3
+python-multipart
+jinja2
+reportlab
+pydantic
+python-dotenv
+openai-whisper
+torch
