@@ -8,7 +8,7 @@ fetch("http://127.0.0.1:8000/health")
   .then(res => res.json())
   .then(data => {
     console.log("Connected:", data);
-    document.getElementById("status").innerText = "🟢 Backend Connected";
+    document.getElementById("status").innerText = "🔵 Backend Connected";
   })
   .catch(error => {
     console.log("Error:", error);
@@ -37,6 +37,10 @@ const jsonViewer = document.getElementById("jsonViewer");
 const alertContainer = document.getElementById("alertContainer");
 const loadingOverlay = document.getElementById("loadingOverlay");
 const toast = document.getElementById("toast");
+const sidebar = document.querySelector(".sidebar");
+const sidebarToggle = document.getElementById("sidebarToggle");
+const sidebarOverlay = document.getElementById("sidebarOverlay");
+const sidebarLinks = document.querySelectorAll(".menu a");
 
 let totalCount = 0;
 let toastTimeout = null;
@@ -90,7 +94,7 @@ const sampleStudents = [
 function showToast(message, type = "success") {
     if (!toast) return;
     toast.textContent = message;
-    toast.style.background = type === "success" ? "#16a34a" : "#dc2626";
+    toast.style.background = type === "success" ? "#1D4ED8" : "#dc2626";
     toast.classList.add("show");
 
     if (toastTimeout) {
@@ -135,20 +139,20 @@ function stopListeningAnimation() {
 
 function setBackendStatus(message, variant = "success") {
     if (!backendStatus) return;
-    const icon = variant === "success" ? "🟢" : variant === "warning" ? "🟡" : "🔴";
+    const icon = variant === "success" ? "🔵" : variant === "warning" ? "🟡" : "🔴";
     backendStatus.textContent = `${icon} ${message}`;
-    backendStatus.style.color = variant === "success" ? "#4ade80" : variant === "warning" ? "#fbbf24" : "#f87171";
+    backendStatus.style.color = variant === "success" ? "#38BDF8" : variant === "warning" ? "#fbbf24" : "#f87171";
 }
 
 function buildStatusBadge(average) {
     const normalized = Number(average);
     if (normalized >= 85) {
-        return { label: "Excellent", color: "#22c55e" };
+        return { label: "Excellent", color: "#0284C7", bg: "#E0F2FE" };
     }
     if (normalized >= 70) {
-        return { label: "Good", color: "#fbbf24" };
+        return { label: "Good", color: "#D97706", bg: "#FEF3C7" };
     }
-    return { label: "Review", color: "#f97316" };
+    return { label: "Review", color: "#DC2626", bg: "#FEE2E2" };
 }
 
 function formatNumber(value) {
@@ -259,7 +263,7 @@ function renderStudentTable(data) {
                 <td>${values[1]}</td>
                 <td>${values[2]}</td>
                 <td>${values[3]}</td>
-                <td><span style="display:inline-flex;padding:6px 10px;border-radius:999px;color:#fff;background:${status.color};font-size:13px;font-weight:600;">${status.label}</span></td>
+                <td><span style="display:inline-flex;padding:6px 12px;border-radius:999px;color:${status.color};background:${status.bg};font-size:12.5px;font-weight:600;">${status.label}</span></td>
             </tr>`;
     }).join("");
 
@@ -494,6 +498,30 @@ function initializeDashboard() {
     addAlert("Dashboard initialized.", "success");
 }
 
+function openSidebar() {
+    sidebar?.classList.add("active");
+    sidebarOverlay?.classList.add("active");
+}
+
+function closeSidebar() {
+    sidebar?.classList.remove("active");
+    sidebarOverlay?.classList.remove("active");
+}
+
+sidebarToggle?.addEventListener("click", () => {
+    if (sidebar?.classList.contains("active")) {
+        closeSidebar();
+    } else {
+        openSidebar();
+    }
+});
+
+sidebarOverlay?.addEventListener("click", closeSidebar);
+
+sidebarLinks.forEach((link) => {
+    link.addEventListener("click", closeSidebar);
+});
+
 micBtn?.addEventListener("click", () => {
     listenVoice();
 });
@@ -502,4 +530,3 @@ refreshBtn?.addEventListener("click", () => {
 });
 
 window.addEventListener("DOMContentLoaded", initializeDashboard);
-
