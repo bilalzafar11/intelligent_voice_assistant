@@ -3,8 +3,12 @@ from typing import Any
 
 import openpyxl
 
-from config import EXCEL_FILE
-from services.session_service import get_current_column
+try:
+    from backend.config import EXCEL_FILE
+    from backend.services.session_service import get_current_column
+except ModuleNotFoundError:  # pragma: no cover
+    from config import EXCEL_FILE
+    from services.session_service import get_current_column
 
 
 def _normalize_header(value: Any) -> str:
@@ -62,26 +66,40 @@ def _resolve_column_number(sheet, requested_column: str):
 
 
 def update_marks(roll_no: int, marks: int):
-    """Update a student's marks in the selected Excel column."""
+    """Update a student's marks in the selected Excel column or create a new row if missing."""
     workbook = openpyxl.load_workbook(EXCEL_FILE, data_only=False)
-    sheet = workbook.active
+    try:
+        sheet = workbook.active
 
-    current_column = get_current_column()
-    if current_column is None:
-        workbook.close()
-        return False, "No column selected."
+        current_column = get_current_column()
+        if current_column is None:
+            return False, "No column selected."
 
-    column_number = _resolve_column_number(sheet, current_column)
-    if column_number is None:
-        workbook.close()
-        return False, "Column not found."
+        column_number = _resolve_column_number(sheet, current_column)
+        if column_number is None:
+            return False, "Column not found."
 
-    for row in range(2, sheet.max_row + 1):
-        if sheet.cell(row=row, column=1).value == roll_no:
-            sheet.cell(row=row, column=column_number).value = marks
+        target_row = None
+        for row in range(2, sheet.max_row + 1):
+            if sheet.cell(row=row, column=1).value == roll_no:
+                target_row = row
+                break
+
+        created_new_row = False
+        if target_row is None:
+            target_row = sheet.max_row + 1
+            sheet.cell(row=target_row, column=1, value=roll_no)
+            created_new_row = True
+
+        sheet.cell(row=target_row, column=column_number).value = marks
+        try:
             workbook.save(EXCEL_FILE)
-            workbook.close()
+            if created_new_row:
+                return True, "New row created and marks updated successfully."
             return True, "Marks Updated Successfully."
-
-    workbook.close()
-    return False, "Roll Number not found."
+        except PermissionError:
+            return False, "Excel file is open in another program or is write-protected. Close the file and try again."
+        except OSError as exc:
+            return False, f"Could not update Excel file: {exc}"
+    finally:
+        workbook.close()

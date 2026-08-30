@@ -273,14 +273,16 @@ h1,h2,h3,h4{
 .content{
     display:grid;
     grid-template-columns:2fr 1fr;
-    gap:22px;
+    gap:18px;
+    align-items:start;
 }
 
 .left-section,
 .right-section{
     display:flex;
     flex-direction:column;
-    gap:22px;
+    gap:14px;
+    align-self:start;
 }
 
 /* =========================================================
@@ -344,31 +346,35 @@ h1,h2,h3,h4{
 ========================================================= */
 
 .voice-area{
-    text-align:center;
-    padding:26px 0;
+    display:flex;
+    align-items:center;
+    gap:18px;
+    text-align:left;
+    padding:18px 0 12px;
 }
 
 .mic-button{
-    width:100px;
-    height:100px;
+    width:64px;
+    height:64px;
+    min-width:64px;
     border:none;
     border-radius:50%;
     background:var(--color-primary);
     color:#fff;
-    font-size:34px;
+    font-size:24px;
     cursor:pointer;
     transition:.3s;
-    margin-bottom:20px;
     box-shadow:0 8px 20px rgba(29,78,216,.3);
+    flex-shrink:0;
 }
 
 .mic-button:hover{
-    transform:scale(1.06);
+    transform:scale(1.04);
     background:var(--color-primary-dark);
 }
 
 .voice-area h2{
-    margin-bottom:8px;
+    margin-bottom:6px;
     font-size:18px;
     font-weight:700;
 }
@@ -377,7 +383,11 @@ h1,h2,h3,h4{
     color:var(--color-text-muted);
     font-size:13.5px;
     max-width:380px;
-    margin:0 auto;
+    margin:0;
+}
+
+.voice-copy{
+    flex:1;
 }
 
 /* =========================================================
@@ -504,12 +514,13 @@ h1,h2,h3,h4{
 .table-wrapper{
     width:100%;
     overflow-x:auto;
+    margin-top:0;
 }
 
 table{
     width:100%;
     border-collapse:collapse;
-    margin-top:12px;
+    margin-top:0;
     background:var(--color-card);
 }
 

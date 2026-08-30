@@ -12,3 +12,4 @@ pydantic
 python-dotenv
 openai-whisper
 torch
+faster-whisper

@@ -8,7 +8,7 @@ UPLOAD_DIR = BASE_DIR / "temp_audio"
 
 EXCEL_FILE = DATABASE_DIR / "student_marks.xlsx"
 
-WHISPER_MODEL = "small"
+WHISPER_MODEL = "large-v3"
 
 API_TITLE = "Intelligent Voice Assistant API"
 API_VERSION = "1.0.0"

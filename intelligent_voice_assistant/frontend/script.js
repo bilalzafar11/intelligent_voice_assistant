@@ -47,6 +47,8 @@ let toastTimeout = null;
 let autoRefreshTimer = null;
 let healthCheckTimer = null;
 let recognition = null;
+let keepMicOnAfterColumnSelection = false;
+let continuousListeningActive = false;
 
 const sampleStudents = [
     {
@@ -303,6 +305,44 @@ function normalizeText(text) {
     return (text || "").trim();
 }
 
+let audioContext = null;
+
+function getAudioContext() {
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) {
+        return null;
+    }
+    if (!audioContext) {
+        audioContext = new AudioCtor();
+    }
+    return audioContext;
+}
+
+function playBeep(count = 1, frequency = 700) {
+    const context = getAudioContext();
+    if (!context) {
+        return;
+    }
+
+    for (let index = 0; index < count; index += 1) {
+        const oscillator = context.createOscillator();
+        const gainNode = context.createGain();
+
+        oscillator.type = "sine";
+        oscillator.frequency.value = frequency + (index * 120);
+
+        gainNode.gain.value = 0.0001;
+        oscillator.connect(gainNode);
+        gainNode.connect(context.destination);
+
+        const startTime = context.currentTime + (index * 0.18);
+        oscillator.start(startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.12, startTime + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.14);
+        oscillator.stop(startTime + 0.16);
+    }
+}
+
 function createSpeechRecognition() {
     const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionCtor) {
@@ -317,41 +357,9 @@ function createSpeechRecognition() {
     return instance;
 }
 
-function startContinuousListening() {
-    if (!recognition) {
-        recognition = createSpeechRecognition();
-    }
-
-    if (!recognition) {
-        return;
-    }
-
-    recognition.onend = () => {
-        if (micBtn) {
-            startListeningAnimation();
-            liveText.textContent = "🎤 Listening... Speak clearly now.";
-            voiceStatus.textContent = "Listening";
-            responseStatus.textContent = "Waiting for voice";
-        }
-        try {
-            recognition.start();
-        } catch (error) {
-            console.error(error);
-        }
-    };
-
-    try {
-        recognition.start();
-    } catch (error) {
-        console.error(error);
-    }
-}
-
 function captureSpeechText() {
     return new Promise((resolve) => {
-        if (!recognition) {
-            recognition = createSpeechRecognition();
-        }
+        recognition = createSpeechRecognition();
 
         if (!recognition) {
             resolve("");
@@ -416,10 +424,24 @@ async function processVoiceText(text) {
         showResponse(data);
         showJSON(data);
 
+        const beepCount = Array.isArray(data.commands)
+            ? data.commands.filter((command) => command.type === "marks").length
+            : (data.type === "marks" ? 1 : 0);
+
+        if (beepCount > 0) {
+            playBeep(beepCount, 700);
+        }
+
         totalCount += 1;
         totalEntries.textContent = totalCount;
 
         addAlert(`Voice command processed: ${data.message}`, response.ok ? "success" : "warning");
+        
+        if (data.type === "unlock" || data.message?.toLowerCase().includes("unlocked")) {
+            continuousListeningActive = false;
+            stopListeningAnimation();
+        }
+        
         if (data.updated || data.message?.toLowerCase().includes("updated")) {
             await refreshDashboard();
             showToast("Marks updated successfully.", "success");
@@ -436,21 +458,12 @@ async function processVoiceText(text) {
         showJSON({ error: error.message });
         addAlert("Backend connection failed.", "error");
         showToast("Backend connection failed.", "error");
+        continuousListeningActive = false;
     }
 }
 
-async function listenVoice() {
-    if (!recognition) {
-        recognition = createSpeechRecognition();
-    }
-
-    if (!recognition) {
-        addAlert("Speech recognition is not supported in this browser.", "error");
-        return;
-    }
-
+async function captureSingleCommand() {
     startListeningAnimation();
-    showLoading(false);
     voiceStatus.textContent = "Listening";
     responseStatus.textContent = "Waiting for voice";
     liveText.textContent = "🎤 Listening... Speak clearly now.";
@@ -462,22 +475,73 @@ async function listenVoice() {
             liveText.textContent = "No speech detected.";
             responseStatus.textContent = "No voice input";
             voiceStatus.textContent = "Ready";
-            addAlert("No speech detected. Please try again.", "warning");
-            return;
+            return false;
         }
 
         await processVoiceText(recognizedText);
-        startContinuousListening();
+        return true;
     } catch (error) {
         console.error(error);
         liveText.textContent = "Unable to capture speech.";
         responseStatus.textContent = "Speech error";
         voiceStatus.textContent = "Offline";
         addAlert("Speech recognition failed.", "error");
-    } finally {
-        stopListeningAnimation();
-        showLoading(false);
+        return false;
     }
+}
+
+async function startContinuousMode() {
+    continuousListeningActive = true;
+    startListeningAnimation();
+    addAlert("Continuous listening started. Say 'exit' to stop.", "success");
+
+    while (continuousListeningActive) {
+        const commandCaptured = await captureSingleCommand();
+
+        if (!commandCaptured) {
+            continue;
+        }
+
+        if (!continuousListeningActive) {
+            break;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    continuousListeningActive = false;
+    stopListeningAnimation();
+}
+
+function stopContinuousMode() {
+    continuousListeningActive = false;
+    if (recognition) {
+        try {
+            recognition.stop();
+        } catch (error) {
+            // Ignore stop errors; the recognizer may already be inactive.
+        }
+    }
+    stopListeningAnimation();
+    voiceStatus.textContent = "Ready";
+    responseStatus.textContent = "Stopped";
+    liveText.textContent = "Microphone stopped. Click to start again.";
+    addAlert("Continuous listening stopped.", "info");
+}
+
+async function listenVoice() {
+    if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+        addAlert("Speech recognition is not supported in this browser.", "error");
+        return;
+    }
+
+    if (continuousListeningActive) {
+        stopContinuousMode();
+        return;
+    }
+
+    showLoading(false);
+    await startContinuousMode();
 }
 
 function initializeDashboard() {
@@ -523,6 +587,11 @@ sidebarLinks.forEach((link) => {
 });
 
 micBtn?.addEventListener("click", () => {
+    if (continuousListeningActive) {
+        stopContinuousMode();
+        return;
+    }
+
     listenVoice();
 });
 refreshBtn?.addEventListener("click", () => {

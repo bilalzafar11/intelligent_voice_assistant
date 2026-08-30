@@ -1,4 +1,7 @@
-from config import MIN_MARKS, MAX_MARKS, SUBJECTS
+try:
+    from backend.config import MIN_MARKS, MAX_MARKS, SUBJECTS
+except ModuleNotFoundError:  # pragma: no cover
+    from config import MIN_MARKS, MAX_MARKS, SUBJECTS
 
 
 def validate_data(data: dict):
