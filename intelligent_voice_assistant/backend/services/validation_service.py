@@ -1,7 +1,9 @@
 try:
-    from backend.config import MIN_MARKS, MAX_MARKS, SUBJECTS
+    from backend.config import MARKS_LIMITS, SUBJECTS
+    from backend.services.session_service import get_current_column
 except ModuleNotFoundError:  # pragma: no cover
-    from config import MIN_MARKS, MAX_MARKS, SUBJECTS
+    from config import MARKS_LIMITS, SUBJECTS
+    from services.session_service import get_current_column
 
 
 def validate_data(data: dict):
@@ -24,7 +26,11 @@ def validate_data(data: dict):
     if data["marks"] is None:
         return False, "Marks not found."
 
-    if not (MIN_MARKS <= data["marks"] <= MAX_MARKS):
-        return False, f"Marks must be between {MIN_MARKS} and {MAX_MARKS}."
+    current_column = get_current_column()
+    limits = MARKS_LIMITS.get(current_column)
+    if limits is not None:
+        minimum, maximum = limits
+        if not minimum <= data["marks"] <= maximum:
+            return False, f"{current_column.title()} marks must be between {minimum} and {maximum}."
 
     return True, "Validation Successful."

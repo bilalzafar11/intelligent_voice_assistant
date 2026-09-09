@@ -170,7 +170,7 @@
 
                     <div class="voice-area">
 
-                        <button class="mic-button" id="micBtn">
+                        <button class="mic-button" id="micBtn" aria-label="Start voice input" aria-pressed="false">
 
                             <i class="fa-solid fa-microphone"></i>
 
@@ -194,37 +194,61 @@
 
                     </div>
 
-                    <div class="status-grid">
+                    <div class="voice-status-card">
 
-                        <div class="status-card">
+                        <div class="voice-status-header">
 
-                            <span>
+                            <h3>
 
-                                Voice Status
+                                <i class="fa-solid fa-waveform-lines"></i>
 
-                            </span>
-
-                            <h3 id="voiceStatus">
-
-                                Ready
+                                Voice Status Card
 
                             </h3>
 
                         </div>
 
-                        <div class="status-card">
+                        <div class="voice-status-grid">
 
-                            <span>
+                            <div class="voice-status-row">
 
-                                Last Response
+                                <span>🎤 Microphone Status</span>
 
-                            </span>
+                                <strong id="microphoneStatusValue">Ready</strong>
 
-                            <h3 id="responseStatus">
+                            </div>
 
-                                Waiting
+                            <div class="voice-status-row">
 
-                            </h3>
+                                <span>🔒 Locked Column</span>
+
+                                <strong id="lockedColumnValue">Not Locked</strong>
+
+                            </div>
+
+                            <div class="voice-status-row">
+
+                                <span>👤 Current Roll Number</span>
+
+                                <strong id="currentRollValue">--</strong>
+
+                            </div>
+
+                            <div class="voice-status-row">
+
+                                <span>✅ Last Updated Marks</span>
+
+                                <strong id="lastUpdatedMarksValue">--</strong>
+
+                            </div>
+
+                            <div class="voice-status-row warning-row">
+
+                                <span>⚠️ Errors or Warnings</span>
+
+                                <strong id="statusWarningValue">No warnings</strong>
+
+                            </div>
 
                         </div>
 
@@ -332,45 +356,35 @@
 
                         </h2>
 
-                        <button class="refresh-btn" id="refreshBtn">
+                        <div>
 
-                            <i class="fa-solid fa-rotate"></i>
+                            <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" />
 
-                            Refresh
+                            <button class="refresh-btn" id="refreshBtn">
 
-                        </button>
+                                <i class="fa-solid fa-rotate"></i>
+
+                                Refresh
+
+                            </button>
+
+                        </div>
 
                     </div>
+
+                    <div class="column-selection-panel" id="columnSelectionPanel" aria-label="Column selection panel"></div>
 
                     <div class="table-wrapper">
 
                         <table>
 
-                            <thead>
+                            <thead id="studentTableHead">
 
-                                <tr>
-
-                                    <th>#</th>
-
-                                    <th>Roll No</th>
-
-                                    <th>Assignment</th>
-
-                                    <th>Test</th>
-
-                                    <th>Midterm</th>
-
-                                    <th>Finalterm</th>
-
-                                    <th>Status</th>
-
-                                </tr>
+                                <tr id="studentTableHeadRow"></tr>
 
                             </thead>
 
-                            <tbody id="studentTable">
-
-                            </tbody>
+                            <tbody id="studentTable"></tbody>
 
                         </table>
 
@@ -383,112 +397,6 @@
             <!-- RIGHT PANEL -->
 
             <div class="right-section">
-
-                <!-- Summary -->
-
-                <div class="card">
-
-                    <div class="card-header">
-
-                        <h2>
-
-                            <i class="fa-solid fa-chart-simple"></i>
-
-                            Summary
-
-                        </h2>
-
-                    </div>
-
-                    <div class="summary-box">
-
-                        <div class="summary-card">
-
-                            <span>Total Students</span>
-
-                            <h2 id="totalStudents">
-
-                                0
-
-                            </h2>
-
-                        </div>
-
-                        <div class="summary-card">
-
-                            <span>Total Entries</span>
-
-                            <h2 id="totalEntries">
-
-                                0
-
-                            </h2>
-
-                        </div>
-
-                        <div class="summary-card">
-
-                            <span>Average Marks</span>
-
-                            <h2 id="averageMarks">
-
-                                0
-
-                            </h2>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-                <!-- API Response -->
-
-                <div class="card">
-
-                    <div class="card-header">
-
-                        <h2>
-
-                            <i class="fa-solid fa-plug"></i>
-
-                            API Response
-
-                        </h2>
-
-                    </div>
-
-                    <div id="apiResponse">
-
-                        Waiting for server...
-
-                    </div>
-
-                </div>
-
-                <!-- JSON -->
-
-                <div class="card">
-
-                    <div class="card-header">
-
-                        <h2>
-
-                            <i class="fa-solid fa-code"></i>
-
-                            JSON Response
-
-                        </h2>
-
-                    </div>
-
-<pre id="jsonViewer">
-
-{}
-
-</pre>
-
-                </div>
 
                 <!-- Alerts -->
 
@@ -582,6 +490,7 @@
 
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="script.js"></script>
 
 </body>

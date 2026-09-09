@@ -100,7 +100,17 @@ def record_audio(filename="temp_audio/live.wav", duration=5, sample_rate=16000):
 
 def speech_to_text(audio_path: str):
     model = get_model()
-    result = model.transcribe(audio_path)
+    result = model.transcribe(
+        audio_path,
+        language="en",
+        task="transcribe",
+        temperature=0,
+        condition_on_previous_text=False,
+        initial_prompt=(
+            "Voice commands for a student marks dashboard: select assignment, test, "
+            "midterm, final or final term; roll number; marks; stop; exit."
+        ),
+    )
     return result["text"].strip()
 
 

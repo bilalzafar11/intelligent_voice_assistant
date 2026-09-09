@@ -4,10 +4,10 @@ from typing import Any
 import openpyxl
 
 try:
-    from backend.config import EXCEL_FILE
+    from backend.config import EXCEL_FILE, MARKS_LIMITS
     from backend.services.session_service import get_current_column
 except ModuleNotFoundError:  # pragma: no cover
-    from config import EXCEL_FILE
+    from config import EXCEL_FILE, MARKS_LIMITS
     from services.session_service import get_current_column
 
 
@@ -74,6 +74,12 @@ def update_marks(roll_no: int, marks: int):
         current_column = get_current_column()
         if current_column is None:
             return False, "No column selected."
+
+        limits = MARKS_LIMITS.get(_normalize_header(current_column))
+        if limits is not None:
+            minimum, maximum = limits
+            if not minimum <= marks <= maximum:
+                return False, f"{current_column.title()} marks must be between {minimum} and {maximum}."
 
         column_number = _resolve_column_number(sheet, current_column)
         if column_number is None:
