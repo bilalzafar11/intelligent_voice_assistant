@@ -2,30 +2,37 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Intelligent Voice Assistant</title>
+    <title>Intelligent Voice Assistant | Marks Management</title>
 
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Main CSS -->
     <link rel="stylesheet" href="style.css">
 
-    <link rel="stylesheet"
+    <!-- Font Awesome -->
+    <link
+        rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-
 </head>
 
 <body>
 
-    <!-- ================= SIDEBAR ================= -->
+    <!-- =====================================================
+         SIDEBAR
+    ====================================================== -->
 
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
 
-        <div>
+        <div class="sidebar-top">
 
             <div class="logo">
 
@@ -33,334 +40,328 @@
                     <i class="fa-solid fa-microphone-lines"></i>
                 </div>
 
-                <div>
+                <div class="logo-text">
+                    <h2>
+                        INTELLIGENT
+                        <br>
+                        VOICE ASSISTANT
+                    </h2>
 
-                    <h2>Voice Assistant</h2>
-
-                    <span>Student Marks Automation</span>
-
+                    <span>
+                        Student Marks Automation
+                    </span>
                 </div>
 
             </div>
 
-            <ul class="menu">
+            <nav>
+                <ul class="menu">
 
-                <li>
+                    <li>
+                        <a href="#" class="active">
+                            <i class="fa-solid fa-house"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
 
-                    <a href="#" class="active">
+                    <li>
+                        <a href="#students">
+                            <i class="fa-solid fa-user-graduate"></i>
+                            <span>Students</span>
+                        </a>
+                    </li>
 
-                        <i class="fa-solid fa-house"></i>
+                    <li>
+                        <a href="#voiceAssistant">
+                            <i class="fa-solid fa-microphone"></i>
+                            <span>Voice Assistant</span>
+                        </a>
+                    </li>
 
-                        Dashboard
-
-                    </a>
-
-                </li>
-
-                <li>
-
-                    <a href="#students">
-
-                        <i class="fa-solid fa-user-graduate"></i>
-
-                        Students
-
-                    </a>
-
-                </li>
-
-                <li>
-
-                    <a href="#reports">
-
-                        <i class="fa-solid fa-chart-line"></i>
-
-                        Reports
-
-                    </a>
-
-                </li>
-
-            </ul>
+                </ul>
+            </nav>
 
         </div>
+
+        <!-- Backend Status -->
 
         <div class="system-box">
 
             <h4>
-
                 <i class="fa-solid fa-server"></i>
-
                 Backend Status
-
             </h4>
 
             <p id="backendStatus">
-
                 🟡 Checking...
-
             </p>
 
         </div>
 
     </aside>
 
-    <!-- Sidebar Overlay (mobile) -->
+
+    <!-- Mobile Sidebar Overlay -->
+
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-    <!-- ================= MAIN ================= -->
+
+    <!-- =====================================================
+         MAIN CONTENT
+    ====================================================== -->
 
     <main class="main">
 
-        <!-- ================= TOPBAR ================= -->
+        <!-- =================================================
+             TOPBAR
+        ================================================== -->
 
         <header class="topbar">
 
-            <button class="menu-toggle" id="sidebarToggle" aria-label="Toggle menu">
+            <div class="topbar-left">
 
-                <i class="fa-solid fa-bars"></i>
+                <button
+                    class="menu-toggle"
+                    id="sidebarToggle"
+                    aria-label="Toggle menu">
 
-            </button>
+                    <i class="fa-solid fa-bars"></i>
 
-            <div>
+                </button>
 
-                <h1>Teacher Dashboard</h1>
+                <div class="topbar-title">
 
-                <span>
+                    <h1>
+                        Intelligent Voice Assistant
+                    </h1>
 
-                    Intelligent Voice Controlled Marks Entry System
+                    <span>
+                        Voice-controlled student marks management
+                    </span>
 
-                </span>
+                </div>
 
             </div>
 
-            <div class="teacher">
 
-                <i class="fa-solid fa-user"></i>
+            <!-- Teacher / Subject Information -->
 
-                Teacher
+            <div class="topbar-right">
+
+                <div class="session-info">
+
+                    <div class="session-icon">
+                        <i class="fa-solid fa-user-tie"></i>
+                    </div>
+
+                    <div>
+                        <span class="session-label">
+                            Teacher
+                        </span>
+
+                        <strong id="teacherName">
+                            Teacher
+                        </strong>
+                    </div>
+
+                </div>
+
+
+                <div class="session-info">
+
+                    <div class="session-icon">
+                        <i class="fa-solid fa-book"></i>
+                    </div>
+
+                    <div>
+                        <span class="session-label">
+                            Subject
+                        </span>
+
+                        <strong id="currentSubject">
+                            --
+                        </strong>
+                    </div>
+
+                </div>
+
+
+                <button
+                    class="logout-btn"
+                    id="logoutBtn"
+                    title="Logout">
+
+                    <i class="fa-solid fa-right-from-bracket"></i>
+
+                    <span>
+                        Logout
+                    </span>
+
+                </button>
 
             </div>
 
         </header>
 
-        <!-- ================= CONTENT ================= -->
+
+        <!-- =================================================
+             CONTENT
+        ================================================== -->
 
         <section class="content">
 
-            <!-- LEFT -->
+
+            <!-- =================================================
+                 LEFT SECTION
+            ================================================== -->
 
             <div class="left-section">
 
-                <!-- Voice Card -->
 
-                <div class="card">
+                <!-- SUBJECT INFORMATION -->
 
-                    <div class="card-header">
+                <div class="card subject-info-card">
 
-                        <h2>
+                    <div class="subject-info-left">
 
-                            <i class="fa-solid fa-microphone"></i>
+                        <div class="subject-large-icon">
+                            <i class="fa-solid fa-book-open"></i>
+                        </div>
 
-                            Voice Assistant
+                        <div>
 
-                        </h2>
+                            <span class="small-label">
+                                CURRENT SUBJECT
+                            </span>
 
-                    </div>
-
-                    <div class="voice-area">
-
-                        <button class="mic-button" id="micBtn" aria-label="Start voice input" aria-pressed="false">
-
-                            <i class="fa-solid fa-microphone"></i>
-
-                        </button>
-
-                        <div class="voice-copy">
-
-                            <h2>
-
-                                Click Microphone
-
+                            <h2 id="subjectTitle">
+                                Loading subject...
                             </h2>
 
-                            <p>
-
-                                First say a column like: "Assignment" or "Midterm". Then say: "roll number 1 marks 85"
-
+                            <p id="subjectDetails">
+                                Academic information
                             </p>
 
                         </div>
 
                     </div>
 
-                    <div class="voice-status-card">
 
-                        <div class="voice-status-header">
+                    <div class="subject-status">
 
-                            <h3>
+                        <span class="status-dot"></span>
 
-                                <i class="fa-solid fa-waveform-lines"></i>
-
-                                Voice Status Card
-
-                            </h3>
-
-                        </div>
-
-                        <div class="voice-status-grid">
-
-                            <div class="voice-status-row">
-
-                                <span>🎤 Microphone Status</span>
-
-                                <strong id="microphoneStatusValue">Ready</strong>
-
-                            </div>
-
-                            <div class="voice-status-row">
-
-                                <span>🔒 Locked Column</span>
-
-                                <strong id="lockedColumnValue">Not Locked</strong>
-
-                            </div>
-
-                            <div class="voice-status-row">
-
-                                <span>👤 Current Roll Number</span>
-
-                                <strong id="currentRollValue">--</strong>
-
-                            </div>
-
-                            <div class="voice-status-row">
-
-                                <span>✅ Last Updated Marks</span>
-
-                                <strong id="lastUpdatedMarksValue">--</strong>
-
-                            </div>
-
-                            <div class="voice-status-row warning-row">
-
-                                <span>⚠️ Errors or Warnings</span>
-
-                                <strong id="statusWarningValue">No warnings</strong>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                    <div class="live-text-box">
-
-                        <h3>
-
-                            Live Speech
-
-                        </h3>
-
-                        <p id="liveText">
-
-                            Waiting for voice input...
-
-                        </p>
+                        <span>
+                            Active Session
+                        </span>
 
                     </div>
 
                 </div>
 
-                <!-- Parsed Command -->
 
-                <div class="card">
+                <!-- =============================================
+                     VOICE ASSISTANT
+                ============================================== -->
 
-                    <div class="card-header">
-
-                        <h2>
-
-                            <i class="fa-solid fa-terminal"></i>
-
-                            Parsed Command
-
-                        </h2>
-
-                    </div>
-
-                    <div class="command-grid">
-
-                        <div class="command-box">
-
-                            <span>
-
-                                Roll Number
-
-                            </span>
-
-                            <h2 id="rollNo">
-
-                                --
-
-                            </h2>
-
-                        </div>
-
-                        <div class="command-box">
-
-                            <span>
-
-                                Subject
-
-                            </span>
-
-                            <h2 id="subjectName">
-
-                                --
-
-                            </h2>
-
-                        </div>
-
-                        <div class="command-box">
-
-                            <span>
-
-                                Marks
-
-                            </span>
-
-                            <h2 id="marksValue">
-
-                                --
-
-                            </h2>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-                                <!-- Student Marks Table -->
-
-                <div class="card" id="students">
+                <div
+                    class="card"
+                    id="voiceAssistant">
 
                     <div class="card-header">
-
-                        <h2>
-
-                            <i class="fa-solid fa-table"></i>
-
-                            Student Marks
-
-                        </h2>
 
                         <div>
 
-                            <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" />
+                            <h2>
+                                <i class="fa-solid fa-microphone"></i>
+                                Voice Assistant
+                            </h2>
 
-                            <button class="refresh-btn" id="refreshBtn">
+                            <p>
+                                Enter marks using natural voice commands
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="voice-area">
+
+                        <button
+                            class="mic-button"
+                            id="micBtn"
+                            aria-label="Start voice input"
+                            aria-pressed="false">
+
+                            <i class="fa-solid fa-microphone"></i>
+
+                        </button>
+
+
+                        <div class="voice-copy">
+
+                            <h2>
+                                Click Microphone
+                            </h2>
+
+                            <p>
+                                First say a column like
+                                <strong>"Assignment"</strong>
+                                or
+                                <strong>"Midterm"</strong>.
+                                Then say:
+                                <strong>"roll number 1 marks 85"</strong>
+                            </p>
+
+
+                            <div class="voice-hint">
+
+                                <i class="fa-solid fa-circle-info"></i>
+
+                                <span>
+                                    Speak clearly for better recognition
+                                </span>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =============================================
+                     STUDENT MARKS
+                ============================================== -->
+
+                <div
+                    class="card"
+                    id="students">
+
+                    <div class="card-header">
+
+                        <div>
+
+                            <h2>
+                                <i class="fa-solid fa-table"></i>
+                                Student Marks
+                            </h2>
+
+                            <p>
+                                Students loaded directly from SQLite database
+                            </p>
+
+                        </div>
+
+
+                        <div class="table-actions">
+
+                            <button
+                                class="refresh-btn"
+                                id="refreshBtn"
+                                title="Refresh students from database">
 
                                 <i class="fa-solid fa-rotate"></i>
 
@@ -372,7 +373,18 @@
 
                     </div>
 
-                    <div class="column-selection-panel" id="columnSelectionPanel" aria-label="Column selection panel"></div>
+
+                    <!-- Dynamic Column Selection -->
+
+                    <div
+                        class="column-selection-panel"
+                        id="columnSelectionPanel"
+                        aria-label="Column selection panel">
+
+                    </div>
+
+
+                    <!-- Student Table -->
 
                     <div class="table-wrapper">
 
@@ -384,41 +396,42 @@
 
                             </thead>
 
-                            <tbody id="studentTable"></tbody>
+
+                            <tbody id="studentTable">
+
+                                <!-- Students loaded from SQLite Database -->
+
+                            </tbody>
 
                         </table>
 
                     </div>
 
-                </div>
 
-            </div>
+                    <!-- Table Footer -->
 
-            <!-- RIGHT PANEL -->
+                    <div class="table-footer">
 
-            <div class="right-section">
+                        <div>
 
-                <!-- Alerts -->
+                            <i class="fa-solid fa-database"></i>
 
-                <div class="card">
+                            <span>
+                                SQLite Database Connected
+                            </span>
 
-                    <div class="card-header">
+                        </div>
 
-                        <h2>
 
-                            <i class="fa-solid fa-bell"></i>
+                        <div>
 
-                            Notifications
+                            <strong id="studentCount">
+                                0
+                            </strong>
 
-                        </h2>
-
-                    </div>
-
-                    <div id="alertContainer">
-
-                        <div class="success-alert">
-
-                            ✅ System Ready
+                            <span>
+                                Students
+                            </span>
 
                         </div>
 
@@ -426,39 +439,274 @@
 
                 </div>
 
-                <!-- Voice Commands -->
+            </div>
 
-                <div class="card">
+
+            <!-- =================================================
+                 RIGHT SECTION
+            ================================================== -->
+
+            <div class="right-section">
+
+
+                <!-- VOICE STATUS -->
+
+                <div class="card workflow-card voice-status-panel">
 
                     <div class="card-header">
 
                         <h2>
-
-                            <i class="fa-solid fa-circle-info"></i>
-
-                            Sample Commands
-
+                            <i class="fa-solid fa-waveform-lines"></i>
+                            Voice Status
                         </h2>
 
                     </div>
 
-                    <ul class="command-list">
 
-                        <li>Assignment</li>
+                    <div class="voice-status-grid">
 
-                        <li>Quiz</li>
+                        <div class="voice-status-row">
 
-                        <li>Mid</li>
+                            <span>
+                                🎤 Microphone Status
+                            </span>
 
-                        <li>Final</li>
+                            <strong id="microphoneStatusValue">
+                                Ready
+                            </strong>
 
-                        <li>Roll Number One</li>
+                        </div>
 
-                        <li>Marks Eighty Five</li>
 
-                        <li>Assignment Roll Number One Ninety</li>
+                        <div class="voice-status-row">
 
-                    </ul>
+                            <span>
+                                🔒 Locked Column
+                            </span>
+
+                            <strong id="lockedColumnValue">
+                                Not Locked
+                            </strong>
+
+                        </div>
+
+
+                        <div class="voice-status-row">
+
+                            <span>
+                                👤 Current Roll Number
+                            </span>
+
+                            <strong id="currentRollValue">
+                                --
+                            </strong>
+
+                        </div>
+
+
+                        <div class="voice-status-row">
+
+                            <span>
+                                ✅ Last Updated Marks
+                            </span>
+
+                            <strong id="lastUpdatedMarksValue">
+                                --
+                            </strong>
+
+                        </div>
+
+
+                        <div class="voice-status-row warning-row">
+
+                            <span>
+                                ⚠️ Errors or Warnings
+                            </span>
+
+                            <strong id="statusWarningValue">
+                                No warnings
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- LIVE SPEECH -->
+
+                <div class="card workflow-card live-speech-panel">
+
+                    <div class="card-header">
+
+                        <h2>
+                            <i class="fa-solid fa-wave-square"></i>
+                            Live Speech
+                        </h2>
+
+                    </div>
+
+
+                    <div class="live-text-box">
+
+                        <p id="liveText">
+                            Waiting for voice input...
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <!-- PARSED COMMAND -->
+
+                <div class="card workflow-card parsed-command-panel">
+
+                    <div class="card-header">
+
+                        <h2>
+                            <i class="fa-solid fa-terminal"></i>
+                            Parsed Command
+                        </h2>
+
+                    </div>
+
+
+                    <div class="command-grid">
+
+                        <div class="command-box">
+
+                            <span>
+                                Roll Number
+                            </span>
+
+                            <h2 id="rollNo">
+                                --
+                            </h2>
+
+                        </div>
+
+
+                        <div class="command-box">
+
+                            <span>
+                                Subject
+                            </span>
+
+                            <h2 id="subjectName">
+                                --
+                            </h2>
+
+                        </div>
+
+
+                        <div class="command-box">
+
+                            <span>
+                                Marks
+                            </span>
+
+                            <h2 id="marksValue">
+                                --
+                            </h2>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- NOTIFICATIONS -->
+
+                <div class="card notification-card">
+
+                    <div class="card-header">
+
+                        <h2>
+                            <i class="fa-solid fa-bell"></i>
+                            Notifications
+                        </h2>
+
+                    </div>
+
+
+                    <div id="alertContainer">
+
+                        <div class="success-alert">
+
+                            <i class="fa-solid fa-circle-check"></i>
+
+                            <span>
+                                System Ready
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- QUICK INFORMATION -->
+
+                <div class="card quick-info-card">
+
+                    <div class="card-header">
+
+                        <h2>
+                            <i class="fa-solid fa-circle-info"></i>
+                            System Information
+                        </h2>
+
+                    </div>
+
+
+                    <div class="quick-info-list">
+
+                        <div>
+
+                            <span>
+                                <i class="fa-solid fa-database"></i>
+                                Data Source
+                            </span>
+
+                            <strong>
+                                SQLite Database
+                            </strong>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                <i class="fa-solid fa-microphone"></i>
+                                Speech Engine
+                            </span>
+
+                            <strong>
+                                Whisper
+                            </strong>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                <i class="fa-solid fa-bolt"></i>
+                                Status
+                            </span>
+
+                            <strong>
+                                Online
+                            </strong>
+
+                        </div>
+
+                    </div>
 
                 </div>
 
@@ -468,30 +716,101 @@
 
     </main>
 
-    <!-- Loading -->
 
-    <div class="loading-overlay" id="loadingOverlay">
+    <!-- =====================================================
+         LOADING OVERLAY
+    ======================================================= -->
+
+    <div
+        class="loading-overlay"
+        id="loadingOverlay">
 
         <div class="loader"></div>
 
         <p>
-
             Listening...
-
         </p>
 
     </div>
 
-    <!-- Toast -->
+
+    <!-- =====================================================
+         TOAST
+    ======================================================= -->
 
     <div id="toast">
-
         Ready
-
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <!-- =====================================================
+         MAIN JAVASCRIPT
+    ======================================================= -->
+
     <script src="script.js"></script>
+
+
+    <!-- =====================================================
+         DATABASE / SESSION INFORMATION
+    ======================================================== -->
+
+    <script>
+
+        /*
+         * Teacher information comes from login.
+         */
+
+        const teacherData =
+            localStorage.getItem("teacher");
+
+
+        if (teacherData) {
+
+            const teacher =
+                JSON.parse(teacherData);
+
+            const teacherName =
+                document.getElementById("teacherName");
+
+            if (teacherName && teacher.name) {
+
+                teacherName.textContent =
+                    teacher.name;
+
+            }
+
+        }
+
+
+        /*
+         * Logout
+         */
+
+        const logoutBtn =
+            document.getElementById("logoutBtn");
+
+
+        if (logoutBtn) {
+
+            logoutBtn.addEventListener(
+                "click",
+                function () {
+
+                    localStorage.removeItem("teacher");
+
+                    localStorage.removeItem(
+                        "selectedSubjectId"
+                    );
+
+                    window.location.href =
+                        "login.html";
+
+                }
+            );
+
+        }
+
+    </script>
 
 </body>
 

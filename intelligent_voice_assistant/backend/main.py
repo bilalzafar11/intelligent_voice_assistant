@@ -1,4 +1,5 @@
 """Application entry point for the Intelligent Voice Assistant API."""
+
 # pyright: reportMissingImports=false
 
 import os
@@ -14,12 +15,17 @@ except ModuleNotFoundError:  # pragma: no cover
 import fastapi
 import fastapi.middleware.cors
 
+# ============================================================
+# PROJECT IMPORTS
+# ============================================================
+
+from backend.api.auth_routes import router as auth_router
 from backend.api.routes import router
 from backend.config import API_TITLE, API_VERSION, UPLOAD_DIR
 
 
 def get_available_port(start_port: int) -> int:
-    """Return the requested port or the next free one if it is already occupied."""
+    """Return the requested port or the next free one if occupied."""
     for port in range(start_port, start_port + 20):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             try:
@@ -27,7 +33,6 @@ def get_available_port(start_port: int) -> int:
             except OSError:
                 continue
             return port
-
     return start_port
 
 
@@ -47,6 +52,9 @@ def create_app() -> fastapi.FastAPI:
         lifespan=lifespan,
     )
 
+    # ========================================================
+    # CORS CONFIGURATION
+    # ========================================================
     app.add_middleware(
         fastapi.middleware.cors.CORSMiddleware,
         allow_origins=["*"],
@@ -55,8 +63,15 @@ def create_app() -> fastapi.FastAPI:
         allow_headers=["*"],
     )
 
+    # ========================================================
+    # API ROUTES
+    # ========================================================
     app.include_router(router)
+    app.include_router(auth_router)
 
+    # ========================================================
+    # HEALTH CHECK
+    # ========================================================
     @app.get("/", tags=["Health"])
     def home() -> dict[str, str]:
         return {
@@ -74,14 +89,28 @@ def create_app() -> fastapi.FastAPI:
     return app
 
 
+# ============================================================
+# APPLICATION INSTANCE
+# ============================================================
 app = create_app()
 
-
+# ============================================================
+# DIRECT EXECUTION
+# ============================================================
 if __name__ == "__main__":
     requested_port = int(os.getenv("PORT", "8000"))
     port = get_available_port(requested_port)
 
     if port != requested_port:
-        print(f"Port {requested_port} is already in use. Starting server on port {port} instead.")
+        print(
+            f"Port {requested_port} is already in use. "
+            f"Starting server on port {port} instead."
+        )
 
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    if uvicorn is not None:
+        uvicorn.run(
+            "backend.main:app",
+            host="0.0.0.0",
+            port=port,
+            reload=True,
+        )

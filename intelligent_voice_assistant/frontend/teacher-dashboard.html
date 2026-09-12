@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Teacher Dashboard</title>
+
+    <link rel="stylesheet" href="teacher-dashboard.css">
+
+</head>
+
+<body>
+
+    <header class="topbar">
+
+        <div>
+            <h1>Teacher Dashboard</h1>
+            <p>Intelligent Marks Entry System</p>
+        </div>
+
+        <div class="teacher-info">
+
+            <span id="teacherName">
+                Teacher
+            </span>
+
+            <button id="logoutBtn">
+                Logout
+            </button>
+
+        </div>
+
+    </header>
+
+
+    <main class="dashboard">
+
+        <div class="welcome">
+
+            <h2>
+                Welcome,
+                <span id="welcomeName">Teacher</span>
+                👋
+            </h2>
+
+            <p>
+                Select a subject to manage students and marks.
+            </p>
+
+        </div>
+
+
+        <h2 class="section-title">
+            My Subjects
+        </h2>
+
+
+        <div id="subjectsContainer" class="subjects-container">
+
+            <p class="loading">
+                Loading subjects...
+            </p>
+
+        </div>
+
+    </main>
+
+
+    <script>
+
+        const API_URL = "http://127.0.0.1:8000";
+
+
+        // ================================
+        // CHECK TEACHER LOGIN
+        // ================================
+
+        const teacherData =
+            localStorage.getItem("teacher");
+
+        if (!teacherData) {
+
+            window.location.href = "login.html";
+
+        }
+
+        const teacher =
+            JSON.parse(teacherData);
+
+
+        // ================================
+        // SHOW TEACHER NAME
+        // ================================
+
+        document.getElementById("teacherName").textContent =
+            teacher.name;
+
+        document.getElementById("welcomeName").textContent =
+            teacher.name;
+
+
+        // ================================
+        // LOAD TEACHER SUBJECTS
+        // ================================
+
+        async function loadSubjects() {
+
+            const container =
+                document.getElementById("subjectsContainer");
+
+            container.innerHTML = `
+                <p class="loading">
+                    Loading your subjects...
+                </p>
+            `;
+
+            try {
+
+                const response = await fetch(
+                    `${API_URL}/subjects/${teacher.id}`
+                );
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        "Server returned an error."
+                    );
+
+                }
+
+                const data =
+                    await response.json();
+
+
+                // ================================
+                // CHECK API RESPONSE
+                // ================================
+
+                if (!data.success) {
+
+                    container.innerHTML = `
+                        <p class="error">
+                            ${data.message || "Unable to load subjects."}
+                        </p>
+                    `;
+
+                    return;
+
+                }
+
+
+                // ================================
+                // NO SUBJECTS
+                // ================================
+
+                if (
+                    !data.subjects ||
+                    data.subjects.length === 0
+                ) {
+
+                    container.innerHTML = `
+                        <p class="error">
+                            No subjects assigned to you.
+                        </p>
+                    `;
+
+                    return;
+
+                }
+
+
+                // ================================
+                // CLEAR LOADING
+                // ================================
+
+                container.innerHTML = "";
+
+
+                // ================================
+                // CREATE SUBJECT CARDS
+                // ================================
+
+                data.subjects.forEach(subject => {
+
+                    const card =
+                        document.createElement("div");
+
+                    card.className =
+                        "subject-card";
+
+
+                    card.innerHTML = `
+
+                        <div class="subject-icon">
+                            📚
+                        </div>
+
+                        <h3>
+                            ${subject.subject_name}
+                        </h3>
+
+                        <p>
+                            <strong>Academic Year:</strong>
+                            ${subject.year}
+                        </p>
+
+                        <p>
+                            <strong>Semester:</strong>
+                            ${subject.semester}
+                        </p>
+
+                        <button
+                            class="open-subject-btn"
+                            data-subject-id="${subject.id}"
+                        >
+                            Open Subject
+                        </button>
+
+                    `;
+
+
+                    // Button click
+                    card
+                        .querySelector(".open-subject-btn")
+                        .addEventListener(
+                            "click",
+                            function () {
+
+                                openSubject(subject);
+
+                            }
+                        );
+
+
+                    container.appendChild(card);
+
+                });
+
+            }
+
+            catch (error) {
+
+                console.error(
+                    "Subject loading error:",
+                    error
+                );
+
+                container.innerHTML = `
+                    <p class="error">
+                        Cannot connect to server.
+                        Please make sure the FastAPI server is running.
+                    </p>
+                `;
+
+            }
+
+        }
+
+
+        // ================================
+        // OPEN SELECTED SUBJECT
+        // ================================
+
+        function openSubject(subject) {
+
+            // Save selected subject ID
+            localStorage.setItem(
+                "selectedSubjectId",
+                subject.id
+            );
+
+
+            // Save complete subject information
+            localStorage.setItem(
+                "selectedSubject",
+                JSON.stringify(subject)
+            );
+
+
+            // Open main dashboard
+            window.location.href = "index.html";
+
+        }
+
+
+        // ================================
+        // LOGOUT
+        // ================================
+
+        document
+            .getElementById("logoutBtn")
+            .addEventListener(
+                "click",
+                function () {
+
+                    localStorage.removeItem(
+                        "teacher"
+                    );
+
+                    localStorage.removeItem(
+                        "selectedSubjectId"
+                    );
+
+                    localStorage.removeItem(
+                        "selectedSubject"
+                    );
+
+                    window.location.href =
+                        "login.html";
+
+                }
+            );
+
+
+        // ================================
+        // START
+        // ================================
+
+        loadSubjects();
+
+    </script>
+
+</body>
+
+</html>
