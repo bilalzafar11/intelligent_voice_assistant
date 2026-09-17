@@ -3,128 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Teacher Login</title>
-
+    <title>Teacher Login | Intelligent Voice Assistant</title>
     <link rel="stylesheet" href="login.css">
 </head>
-
 <body>
-
-    <div class="login-container">
-
-        <div class="login-card">
-
-            <div class="logo">
-                🎓
+    <main class="auth-shell">
+        <section class="brand-panel">
+            <div class="brand-mark"><span>VA</span></div>
+            <div class="brand-copy">
+                <p class="eyebrow">ACADEMIC AUTOMATION</p>
+                <h1>Intelligent Voice<br><span>Assistant</span></h1>
+                <p class="brand-description">Student Marks Automation</p>
             </div>
+            <div class="brand-footer"><span class="dot"></span> Secure teacher workspace</div>
+        </section>
 
-            <h1>Teacher Login</h1>
+        <section class="login-panel">
+            <div class="login-card">
+                <div class="mobile-brand"><div class="brand-mark small"><span>VA</span></div></div>
+                <p class="eyebrow">WELCOME BACK</p>
+                <h2>Teacher Login</h2>
+                <p class="subtitle">Sign in to manage student marks with ease.</p>
 
-            <p class="subtitle">
-                Intelligent Marks Entry System
-            </p>
-
-            <form id="loginForm">
-
-                <div class="input-group">
-                    <label>Email</label>
-
-                    <input
-                        type="email"
-                        id="email"
-                        placeholder="Enter your email"
-                        required
-                    >
-                </div>
-
-                <div class="input-group">
-                    <label>Password</label>
-
-                    <input
-                        type="password"
-                        id="password"
-                        placeholder="Enter your password"
-                        required
-                    >
-                </div>
-
-                <button type="submit" id="loginBtn">
-                    Login
-                </button>
-
-                <p id="message"></p>
-
-            </form>
-
-        </div>
-
-    </div>
-
+                <form id="loginForm">
+                    <div class="input-group">
+                        <label for="email">Email address</label>
+                        <div class="input-wrap"><span class="input-icon">✉</span>
+                            <input type="email" id="email" placeholder="teacher@example.com" autocomplete="email" required>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <div class="label-row"><label for="password">Password</label></div>
+                        <div class="input-wrap"><span class="input-icon">▣</span>
+                            <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required>
+                            <button type="button" class="password-toggle" id="togglePassword" aria-label="Show password">Show</button>
+                        </div>
+                    </div>
+                    <button type="submit" id="loginBtn"><span>Sign in to dashboard</span><span class="arrow">→</span></button>
+                    <p id="message" role="status" aria-live="polite"></p>
+                </form>
+                <p class="login-footer">Authorized teachers only &nbsp;•&nbsp; Intelligent Voice Assistant</p>
+            </div>
+        </section>
+    </main>
     <script>
         const loginForm = document.getElementById("loginForm");
         const message = document.getElementById("message");
-
+        const loginBtn = document.getElementById("loginBtn");
+        const password = document.getElementById("password");
+        document.getElementById("togglePassword").addEventListener("click", function () {
+            const visible = password.type === "text";
+            password.type = visible ? "password" : "text";
+            this.textContent = visible ? "Show" : "Hide";
+            this.setAttribute("aria-label", visible ? "Show password" : "Hide password");
+        });
         loginForm.addEventListener("submit", async function(event) {
-
             event.preventDefault();
-
-            const email = document.getElementById("email").value;
-            const password = document.getElementById("password").value;
-
-            message.textContent = "Logging in...";
-            message.className = "";
-
+            const email = document.getElementById("email").value.trim();
+            const passwordValue = password.value;
+            message.textContent = "Signing you in...";
+            message.className = "loading";
+            loginBtn.disabled = true;
             try {
-
                 const response = await fetch("http://127.0.0.1:8000/login", {
                     method: "POST",
-
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-
-                    body: JSON.stringify({
-                        email: email,
-                        password: password
-                    })
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({email, password: passwordValue})
                 });
-
                 const data = await response.json();
-
                 if (data.success) {
-
-                    // Teacher information temporarily save
-                    localStorage.setItem(
-                        "teacher",
-                        JSON.stringify(data.teacher)
-                    );
-
+                    localStorage.setItem("teacher", JSON.stringify(data.teacher));
                     message.textContent = "Login successful!";
                     message.className = "success";
-
-                    // Open teacher dashboard
                     window.location.href = "teacher-dashboard.html";
-
                 } else {
-
-                    message.textContent = data.message;
+                    message.textContent = data.message || "Invalid email or password.";
                     message.className = "error";
-
                 }
-
             } catch (error) {
-
                 console.error(error);
-
-                message.textContent =
-                    "Cannot connect to server. Please start FastAPI.";
-
+                message.textContent = "Cannot connect to server. Please start FastAPI.";
                 message.className = "error";
-            }
-
+            } finally { loginBtn.disabled = false; }
         });
     </script>
-
 </body>
-</html>s
+</html>

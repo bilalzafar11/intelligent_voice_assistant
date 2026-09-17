@@ -7,33 +7,34 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Teacher Dashboard</title>
+    <title>Intelligent Voice Assistant | Teacher Dashboard</title>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="teacher-dashboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
 </head>
 
 <body>
 
     <header class="topbar">
-
-        <div>
-            <h1>Teacher Dashboard</h1>
-            <p>Intelligent Marks Entry System</p>
+        <div class="brand-lockup">
+            <div class="brand-icon"><i class="fa-solid fa-microphone-lines"></i></div>
+            <div class="brand-copy">
+                <div class="brand-kicker">INTELLIGENT VOICE ASSISTANT</div>
+                <h1>Student Marks Automation</h1>
+                <div class="page-label"><span></span> Teacher Dashboard</div>
+            </div>
         </div>
-
         <div class="teacher-info">
-
-            <span id="teacherName">
-                Teacher
-            </span>
-
-            <button id="logoutBtn">
-                Logout
-            </button>
-
+            <div class="teacher-profile">
+                <div class="teacher-avatar"><i class="fa-solid fa-user"></i></div>
+                <div class="teacher-copy"><small>Signed in as</small><strong id="teacherName">Teacher</strong></div>
+            </div>
+            <button id="logoutBtn"><i class="fa-solid fa-right-from-bracket"></i><span>Logout</span></button>
         </div>
-
     </header>
 
 
