@@ -4,6 +4,93 @@ import openpyxl
 
 from backend.api import routes
 from backend.services import excel_service
+from backend.services.parser_service import parse_voice_command
+
+
+def test_voice_command_accepts_short_roll_number_for_prefixed_excel_id():
+    assert excel_service._roll_matches("23BSIT-01", 1)
+    assert excel_service._roll_matches("24BSIT-02", "2")
+    assert not excel_service._roll_matches("23BSIT-11", 1)
+
+
+def test_voice_parser_accepts_spoken_short_roll_and_chained_prefixed_rolls():
+    result = parse_voice_command("roll no one marks two")
+    assert result["roll_no"] == 1
+    assert result["marks"] == 2
+
+    result = parse_voice_command(
+        "roll no 23BSIT-01 marks 2 and roll no 24BSIT-02 marks 4"
+    )
+    assert result["multi"] is True
+    assert [item["roll_no"] for item in result["commands"]] == [
+        "23BSIT-01",
+        "24BSIT-02",
+    ]
+
+
+def test_voice_command_updates_multiple_columns_without_locking(monkeypatch):
+    calls = []
+
+    def fake_update_marks(roll_no, marks):
+        calls.append((routes.get_current_column(), roll_no, marks))
+        return True, "Marks Updated Successfully."
+
+    monkeypatch.setattr(routes, "update_marks", fake_update_marks)
+    monkeypatch.setattr(routes, "get_current_column", lambda: None)
+    monkeypatch.setattr(routes, "set_current_column", lambda column: calls.append(("selected", column, None)))
+
+    response = routes.voice_command(
+        SimpleNamespace(text="roll no 1 assignment marks 20 test marks 30 midterm marks 40")
+    )
+
+    assert response["updated_count"] == 3
+    assert [(roll, marks) for kind, roll, marks in calls if kind != "selected"] == [
+        (1, 20),
+        (1, 30),
+        (1, 40),
+    ]
+
+
+def test_voice_column_only_command_does_not_lock_column(monkeypatch):
+    monkeypatch.setattr(routes, "get_current_column", lambda: "assignment")
+    response = routes.voice_command(SimpleNamespace(text="select final"))
+
+    assert response["voice_column_ignored"] is True
+    assert "roll number" in response["message"]
+
+
+def test_voice_command_accepts_presentation_before_roll(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(routes, "get_current_column", lambda: None)
+    monkeypatch.setattr(routes, "set_current_column", lambda column: None)
+    monkeypatch.setattr(
+        routes,
+        "update_marks",
+        lambda roll_no, marks: calls.append((roll_no, marks)) or (True, "Marks Updated Successfully."),
+    )
+
+    response = routes.voice_command(
+        SimpleNamespace(text="presentation roll no 1 marks 4")
+    )
+
+    assert response["updated"] is True
+    assert response["results"][0]["column"] == "presentation"
+    assert calls == [(1, 4)]
+
+
+def test_final_and_final_term_are_same_assessment():
+    final = parse_voice_command("final roll no 1 marks 35")
+    final_term = parse_voice_command("final term roll no 1 marks 35")
+
+    assert final["column"] == "final"
+    assert final_term["column"] == "final"
+
+
+def test_common_presentation_speech_misspelling_is_normalized():
+    result = parse_voice_command("presenation roll no 1 marks 4")
+    assert result["column"] == "presentation"
+    assert result["marks"] == 4
 
 
 def test_voice_command_updates_multiple_roll_entries_in_one_sentence(monkeypatch):
@@ -176,6 +263,25 @@ def test_update_marks_creates_row_when_roll_does_not_exist(tmp_path, monkeypatch
     assert row_values[1][1] == 8
 
 
+def test_update_marks_creates_missing_presentation_column(tmp_path, monkeypatch):
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["Roll_No", "Test"])
+    sheet.append(["23BSIT-01", 0])
+    workbook.save(tmp_path / "test.xlsx")
+
+    monkeypatch.setattr(excel_service, "EXCEL_FILE", str(tmp_path / "test.xlsx"))
+    monkeypatch.setattr(excel_service, "get_current_column", lambda: "presentation")
+
+    success, message = excel_service.update_marks(1, 4)
+
+    assert success is True
+    assert "updated" in message.lower()
+    updated = openpyxl.load_workbook(tmp_path / "test.xlsx", data_only=True)
+    assert [cell.value for cell in updated.active[1]] == ["Roll_No", "Test", "Presentation"]
+    assert updated.active.cell(row=2, column=3).value == 4
+
+
 def test_update_marks_rejects_marks_outside_selected_column_range(tmp_path, monkeypatch):
     workbook = openpyxl.Workbook()
     sheet = workbook.active
@@ -188,7 +294,7 @@ def test_update_marks_rejects_marks_outside_selected_column_range(tmp_path, monk
     for column, marks, expected_range in [
         ("assignment", 11, "1 and 10"),
         ("midterm", 31, "1 and 30"),
-        ("final", 41, "1 and 40"),
+        ("final", 51, "1 and 50"),
     ]:
         monkeypatch.setattr(excel_service, "get_current_column", lambda column=column: column)
         success, message = excel_service.update_marks(1, marks)

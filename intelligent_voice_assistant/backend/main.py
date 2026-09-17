@@ -22,6 +22,8 @@ import fastapi.middleware.cors
 from backend.api.auth_routes import router as auth_router
 from backend.api.routes import router
 from backend.config import API_TITLE, API_VERSION, UPLOAD_DIR
+from database import Base, engine
+import models  # noqa: F401
 
 
 def get_available_port(start_port: int) -> int:
@@ -39,6 +41,7 @@ def get_available_port(start_port: int) -> int:
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI) -> AsyncIterator[None]:
     """Initialize resources when the server starts."""
+    Base.metadata.create_all(bind=engine)
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     yield
 

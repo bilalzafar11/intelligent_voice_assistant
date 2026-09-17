@@ -15,6 +15,17 @@ def _normalize_header(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "", str(value).strip().lower())
 
 
+def _roll_matches(existing_roll, requested_roll) -> bool:
+    existing = str(existing_roll).strip().upper()
+    requested = str(requested_roll).strip().upper()
+    if existing == requested:
+        return True
+    if requested.isdigit():
+        suffix = f"{int(requested):02d}"
+        return existing.endswith(f"-{suffix}") or existing.endswith(f"BSIT{suffix}")
+    return existing.isdigit() and requested.endswith(f"-{int(existing):02d}")
+
+
 def read_students() -> list[dict[str, Any]]:
     """Read the Excel workbook and return student rows using the actual workbook headers."""
     workbook = openpyxl.load_workbook(EXCEL_FILE, data_only=True)
@@ -52,10 +63,12 @@ def _resolve_column_number(sheet, requested_column: str):
         header_norm = _normalize_header(header_name)
         if header_norm == requested:
             return cell.column
-        if requested in {"assignment", "test", "midterm", "final", "finalterm"}:
+        if requested in {"quiz", "assignment", "test", "presentation", "midterm", "final", "finalterm"}:
             aliases = {
+            "quiz": {"quiz", "quize", "quizzes"},
                 "assignment": {"assignment"},
-                "test": {"test", "quiz", "quizzes"},
+            "test": {"test"},
+            "presentation": {"presentation"},
                 "midterm": {"midterm", "mid"},
                 "final": {"final", "finalterm", "finals"},
                 "finalterm": {"final", "finalterm", "finals"},
@@ -83,11 +96,24 @@ def update_marks(roll_no: int, marks: int):
 
         column_number = _resolve_column_number(sheet, current_column)
         if column_number is None:
-            return False, "Column not found."
+            column_headers = {
+                "quiz": "Quiz",
+                "assignment": "Assignment",
+                "test": "Test",
+                "presentation": "Presentation",
+                "midterm": "Midterm",
+                "final": "Finalterm",
+                "finalterm": "Finalterm",
+            }
+            header_name = column_headers.get(_normalize_header(current_column))
+            if header_name is None:
+                return False, "Column not found."
+            column_number = sheet.max_column + 1
+            sheet.cell(row=1, column=column_number, value=header_name)
 
         target_row = None
         for row in range(2, sheet.max_row + 1):
-            if sheet.cell(row=row, column=1).value == roll_no:
+            if _roll_matches(sheet.cell(row=row, column=1).value, roll_no):
                 target_row = row
                 break
 

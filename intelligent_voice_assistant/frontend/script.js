@@ -29,6 +29,7 @@ const subjectName = document.getElementById("subjectName");
 const marksValue = document.getElementById("marksValue");
 
 const refreshBtn = document.getElementById("refreshBtn");
+const downloadExcelBtn = document.getElementById("downloadExcelBtn");
 const studentTable = document.getElementById("studentTable");
 const studentTableHeadRow = document.getElementById("studentTableHeadRow");
 
@@ -54,6 +55,8 @@ const columnSelectionPanel =
 
 const microphoneStatusValue =
     document.getElementById("microphoneStatusValue");
+
+let listeningSessionActive = false; // Assuming this variable is defined somewhere in the code
 
 const lockedColumnValue =
     document.getElementById("lockedColumnValue");
@@ -82,6 +85,16 @@ const subjectDetailsElement =
 const studentCountElement =
     document.getElementById("studentCount");
 
+const saveDraftBtn = document.getElementById("saveDraftBtn");
+const saveSheetBtn = document.getElementById("saveSheetBtn");
+const savedSheetsList = document.getElementById("savedSheetsList");
+const draftSheetsList = document.getElementById("draftSheetsList");
+const deleteSheetsList = document.getElementById("deleteSheetsList");
+const savedSheetCount = document.getElementById("savedSheetCount");
+const draftSheetCount = document.getElementById("draftSheetCount");
+const sheetTabs = document.querySelectorAll(".sheet-tab");
+let currentSheetId = null;
+
 
 /* ==========================================================
    SESSION DATA
@@ -97,6 +110,16 @@ let currentTeacher = null;
 let currentSubject = null;
 
 
+function isTeacherLoggedIn() {
+
+    return Boolean(
+        currentTeacher &&
+        currentTeacher.id
+    );
+
+}
+
+
 /* ==========================================================
    STATE
 ========================================================== */
@@ -108,13 +131,34 @@ let autoRefreshTimer = null;
 let healthCheckTimer = null;
 
 let recognition = null;
+let recognitionRestartTimer = null;
+let localVoiceRecorder = null;
+let localVoiceFallbackActive = false;
 
 let continuousListeningActive = false;
+let voiceCommandQueue = Promise.resolve();
 
 let lastUpdatedMarksText = "--";
 let warningMessage = "No warnings";
 
 let stopCommandHandled = false;
+
+const lockableTableColumns = new Set([
+    "quiz",
+    "test",
+    "assignment",
+    "presentation",
+    "midterm",
+    "final term"
+]);
+
+function normalizeColumnName(columnName) {
+
+    return String(columnName || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+
+}
 
 
 /*
@@ -214,6 +258,88 @@ function normalizeText(text) {
 }
 
 
+function downloadFinalExcel() {
+
+    window.location.href = `${API_URL}/download-excel`;
+
+}
+
+function getEditableTableRows() {
+    return Array.from(studentTable?.querySelectorAll("tr[data-roll-no]") || []).map(row => {
+        const cells = row.querySelectorAll("td");
+        return {
+            roll_no: row.dataset.rollNo,
+            name: cells[1]?.textContent.trim() || "",
+            quiz: Number(cells[3]?.textContent) || 0,
+            test: Number(cells[4]?.textContent) || 0,
+            assignment: Number(cells[5]?.textContent) || 0,
+            presentation: Number(cells[6]?.textContent) || 0,
+            midterm: Number(cells[7]?.textContent) || 0,
+            final: Number(cells[8]?.textContent) || 0
+        };
+    });
+}
+
+async function loadSheets() {
+    if (!currentTeacher?.id || !selectedSubjectId) return;
+    const response = await fetch(`${API_URL}/sheets/${currentTeacher.id}?subject_id=${selectedSubjectId}`);
+    const data = await response.json();
+    const sheets = data.sheets || [];
+    const saved = sheets.filter(sheet => sheet.status === "saved");
+    const drafts = sheets.filter(sheet => sheet.status === "draft");
+    setTextSafe(savedSheetCount, saved.length);
+    setTextSafe(draftSheetCount, drafts.length);
+    const item = (sheet, includeDelete = false) => `
+        <div class="sheet-item">
+            <button class="sheet-open-btn" data-sheet-id="${sheet.id}">
+                <strong>${sheet.name}</strong><small>${new Date(sheet.updated_at).toLocaleString()}</small>
+            </button>
+            ${sheet.status === "saved" ? `<button class="sheet-download-btn" data-sheet-id="${sheet.id}" title="Download Excel"><i class="fa-solid fa-download"></i></button>` : ""}
+            ${includeDelete ? `<button class="sheet-delete-btn" data-sheet-id="${sheet.id}" title="Delete sheet"><i class="fa-solid fa-trash"></i></button>` : ""}
+        </div>`;
+    const empty = `<p class="sheet-empty">No sheets yet.</p>`;
+    if (savedSheetsList) savedSheetsList.innerHTML = saved.map(sheet => item(sheet)).join("") || empty;
+    if (draftSheetsList) draftSheetsList.innerHTML = drafts.map(sheet => item(sheet)).join("") || empty;
+    if (deleteSheetsList) deleteSheetsList.innerHTML = sheets.map(sheet => item(sheet, true)).join("") || empty;
+}
+
+async function saveCurrentSheet(status) {
+    if (!currentTeacher?.id || !selectedSubjectId) return;
+    const defaultName = `${currentSubject?.subject_name || "Subject"} - ${status === "draft" ? "Draft" : "Final"}`;
+    const name = window.prompt("Sheet name:", defaultName);
+    if (name === null) return;
+    const response = await fetch(`${API_URL}/sheets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teacher_id: currentTeacher.id, subject_id: Number(selectedSubjectId), sheet_id: currentSheetId, name, status, rows: getEditableTableRows() })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.detail || "Unable to save sheet.");
+    currentSheetId = data.sheet.id;
+    showToast(status === "draft" ? "Draft saved." : "Sheet saved.", "success");
+    await loadSheets();
+}
+
+async function openSheet(sheetId) {
+    const response = await fetch(`${API_URL}/sheets/${currentTeacher.id}?subject_id=${selectedSubjectId}`);
+    const data = await response.json();
+    const sheet = (data.sheets || []).find(item => item.id === Number(sheetId));
+    if (!sheet) return;
+    currentSheetId = sheet.id;
+    renderDatabaseStudents(sheet.rows || []);
+    showToast(`${sheet.name} loaded.`, "success");
+}
+
+async function deleteSavedSheet(sheetId) {
+    if (!window.confirm("Delete this sheet permanently?")) return;
+    const response = await fetch(`${API_URL}/sheets/${currentTeacher.id}/${sheetId}`, { method: "DELETE" });
+    if (!response.ok) throw new Error("Unable to delete sheet.");
+    if (currentSheetId === Number(sheetId)) currentSheetId = null;
+    await loadSheets();
+    showToast("Sheet deleted.", "success");
+}
+
+
 /* ==========================================================
    SESSION / TEACHER
 ========================================================== */
@@ -251,6 +377,35 @@ function loadTeacherInformation() {
 }
 
 
+function setVoiceAccess(enabled) {
+
+    if (!micBtn) {
+        return;
+    }
+
+    micBtn.disabled = !enabled;
+    micBtn.setAttribute(
+        "aria-disabled",
+        String(!enabled)
+    );
+
+    if (!enabled) {
+        micBtn.title = "Login as a teacher to use voice commands.";
+        setTextSafe(
+            voiceStatus,
+            "Login required"
+        );
+        setTextSafe(
+            liveText,
+            "Please login as a teacher to use voice commands."
+        );
+    } else {
+        micBtn.title = "Start voice input";
+    }
+
+}
+
+
 /* ==========================================================
    LOAD SUBJECT INFORMATION
 ========================================================== */
@@ -280,13 +435,17 @@ async function loadSelectedSubject() {
 
 
     try {
-
-        /*
-         * Our existing API:
-         * GET /students/{subject_id}
-         *
-         * It returns subject information + students.
-         */
+        const storedSubject = localStorage.getItem("selectedSubject");
+        if (storedSubject) {
+            currentSubject = JSON.parse(storedSubject);
+            setTextSafe(currentSubjectElement, currentSubject.subject_name);
+            setTextSafe(subjectTitleElement, currentSubject.subject_name);
+            setTextSafe(
+                subjectDetailsElement,
+                `${currentSubject.year} • Semester ${currentSubject.semester}`
+            );
+            return { success: true, subject: currentSubject };
+        }
 
         const response = await fetch(
             `${API_URL}/students/${selectedSubjectId}`,
@@ -583,6 +742,15 @@ async function getHealthStatus() {
         "warning"
     );
 
+    const controller =
+        new AbortController();
+
+    const timeoutId =
+        setTimeout(
+            () => controller.abort(),
+            5000
+        );
+
 
     try {
 
@@ -590,7 +758,8 @@ async function getHealthStatus() {
             await fetch(
                 `${API_URL}/health`,
                 {
-                    cache: "no-store"
+                    cache: "no-store",
+                    signal: controller.signal
                 }
             );
 
@@ -658,6 +827,10 @@ async function getHealthStatus() {
 
 
         return false;
+
+    } finally {
+
+        clearTimeout(timeoutId);
 
     }
 
@@ -852,21 +1025,35 @@ function renderDatabaseStudents(students) {
 
     const headers = [
 
+        "S.No",
+        "Name",
         "Roll No",
-        "Student Name",
+        "Quiz",
+        "Test",
         "Assignment",
+        "Presentation",
         "Midterm",
-        "Final"
+        "Final Term",
+        "Total"
 
     ];
 
 
     studentTableHeadRow.innerHTML =
         headers
-            .map(
-                header =>
-                    `<th>${header}</th>`
-            )
+            .map(header => {
+                const isLockable = lockableTableColumns.has(
+                    header.toLowerCase()
+                );
+
+                return `
+                    <th
+                        ${isLockable ? `class="lockable-column" data-column-name="${header}"` : ""}
+                    >
+                        ${header}
+                    </th>
+                `;
+            })
             .join("");
 
 
@@ -879,7 +1066,7 @@ function renderDatabaseStudents(students) {
         studentTable.innerHTML = `
             <tr>
                 <td
-                    colspan="5"
+                    colspan="10"
                     style="text-align:center; padding:20px;"
                 >
                     No students found for this subject.
@@ -922,6 +1109,14 @@ function renderDatabaseStudents(students) {
         students
             .map(student => {
 
+                const quiz = Number(student.quiz) || 0;
+                const test = Number(student.test) || 0;
+                const assignment = Number(student.assignment) || 0;
+                const presentation = Number(student.presentation) || 0;
+                const midterm = Number(student.midterm) || 0;
+                const finalTerm = Number(student.final ?? student.finalterm) || 0;
+                const total = quiz + test + assignment + presentation + midterm + finalTerm;
+
                 const studentId =
                     student.id ?? "";
 
@@ -939,25 +1134,31 @@ function renderDatabaseStudents(students) {
                     >
 
                         <td>
-                            <strong>
-                                ${rollNo}
-                            </strong>
+                            ${students.indexOf(student) + 1}
                         </td>
 
                         <td>
-                            ${studentName}
+                            <strong>${studentName}</strong>
                         </td>
 
-                        <td class="mark-cell">
-                            --
+                        <td>
+                            ${rollNo}
                         </td>
 
-                        <td class="mark-cell">
-                            --
-                        </td>
+                        <td class="mark-cell" contenteditable="true" data-field="quiz">${quiz}</td>
 
-                        <td class="mark-cell">
-                            --
+                        <td class="mark-cell" contenteditable="true" data-field="test">${test}</td>
+
+                        <td class="mark-cell" contenteditable="true" data-field="assignment">${assignment}</td>
+
+                        <td class="mark-cell" contenteditable="true" data-field="presentation">${presentation}</td>
+
+                        <td class="mark-cell" contenteditable="true" data-field="midterm">${midterm}</td>
+
+                        <td class="mark-cell" contenteditable="true" data-field="final">${finalTerm}</td>
+
+                        <td class="mark-cell total-cell">
+                            <strong>${total}</strong>
                         </td>
 
                     </tr>
@@ -1013,6 +1214,79 @@ function renderDatabaseStudents(students) {
 
     updateLockedColumnStyles();
 
+}
+
+
+function updateLiveStudentMarks(data) {
+
+    const results = Array.isArray(data?.results)
+        ? data.results
+        : data?.updated
+            ? [{
+                roll_no: data.roll_no,
+                marks: data.marks,
+                updated: true,
+                column: data.selected_column || data.column
+            }]
+            : [];
+
+    const columnIndexes = {
+        quiz: 3,
+        test: 4,
+        assignment: 5,
+        presentation: 6,
+        midterm: 7,
+        final: 8,
+        finalterm: 8
+    };
+
+    results.forEach(result => {
+
+        if (!result?.updated || result.roll_no == null) {
+            return;
+        }
+
+        const requestedRoll = String(result.roll_no).trim().toUpperCase();
+        const row = Array.from(studentTable?.querySelectorAll("tr[data-roll-no]") || [])
+            .find(candidate => {
+                const existingRoll = String(candidate.dataset.rollNo || "").trim().toUpperCase();
+                if (existingRoll === requestedRoll) return true;
+                if (!/^\d+$/.test(requestedRoll)) return false;
+                const suffix = requestedRoll.padStart(2, "0");
+                return existingRoll.endsWith(`-${suffix}`) || existingRoll.endsWith(`BSIT${suffix}`);
+            });
+
+        const rawColumnName = String(
+            result.column || data.selected_column || data.column || ""
+        ).toLowerCase().replace(/[_-]+/g, " ").trim();
+        const columnName = rawColumnName === "final term" || rawColumnName === "finalterm"
+            ? "final"
+            : rawColumnName;
+
+        const cellIndex = columnIndexes[columnName];
+
+        if (!row || cellIndex === undefined) {
+            return;
+        }
+
+        const cell = row.querySelectorAll("td")[cellIndex];
+
+        if (cell) {
+            cell.textContent = result.marks;
+        }
+
+        const cells = row.querySelectorAll("td");
+        const total = [3, 4, 5, 6, 7, 8]
+            .reduce(
+                (sum, index) => sum + (Number(cells[index]?.textContent) || 0),
+                0
+            );
+
+        if (cells[9]) {
+            cells[9].textContent = total;
+        }
+
+    });
 }
 
 
@@ -1329,8 +1603,8 @@ function updateLockedColumnStyles() {
 
         const isLocked =
             excelState.lockedColumn &&
-            columnName ===
-            excelState.lockedColumn;
+            normalizeColumnName(columnName) ===
+            normalizeColumnName(excelState.lockedColumn);
 
 
         button.classList.toggle(
@@ -1356,14 +1630,15 @@ function updateLockedColumnStyles() {
     tableHeaders.forEach(headerCell => {
 
         const columnName =
+            headerCell.dataset.columnName ||
             headerCell.textContent.trim();
 
 
         headerCell.classList.toggle(
             "locked-column",
             Boolean(excelState.lockedColumn) &&
-            columnName ===
-            excelState.lockedColumn
+            normalizeColumnName(columnName) ===
+            normalizeColumnName(excelState.lockedColumn)
         );
 
     });
@@ -1390,8 +1665,8 @@ function updateLockedColumnStyles() {
             cell.classList.toggle(
                 "locked-column",
                 Boolean(excelState.lockedColumn) &&
-                matchedHeader ===
-                excelState.lockedColumn
+                normalizeColumnName(matchedHeader) ===
+                normalizeColumnName(excelState.lockedColumn)
             );
 
         });
@@ -1437,10 +1712,8 @@ function syncLockedColumn(
     const matchingHeader =
         headers.find(
             header =>
-                String(header)
-                    .trim()
-                    .toLowerCase() ===
-                safeColumnName.toLowerCase()
+                normalizeColumnName(header) ===
+                normalizeColumnName(safeColumnName)
         );
 
 
@@ -1542,11 +1815,6 @@ async function persistLockedColumnToBackend(
             : "";
 
 
-    if (!safeColumnName) {
-        return;
-    }
-
-
     try {
 
         const response =
@@ -1574,7 +1842,7 @@ async function persistLockedColumnToBackend(
 
         const selectedColumn =
             data?.selected_column ||
-            safeColumnName;
+            "";
 
 
         syncLockedColumn(
@@ -1587,7 +1855,9 @@ async function persistLockedColumnToBackend(
 
         showToast(
             data?.message ||
-            `Column '${selectedColumn}' Locked`,
+            (selectedColumn
+                ? `Column '${selectedColumn}' Locked`
+                : "Column unlocked."),
             response.ok
                 ? "success"
                 : "error"
@@ -1599,20 +1869,31 @@ async function persistLockedColumnToBackend(
         console.error(error);
 
 
-        syncLockedColumn(
-            safeColumnName,
-            {
-                showMessage: true
-            }
-        );
+        syncLockedColumn(safeColumnName, { showMessage: true });
 
 
         showToast(
-            `Column '${safeColumnName}' Locked locally.`,
+            safeColumnName
+                ? `Column '${safeColumnName}' Locked locally.`
+                : "Column unlocked locally.",
             "warning"
         );
 
     }
+
+}
+
+
+function toggleLockedColumn(columnName) {
+
+    const isSameColumn =
+        excelState.lockedColumn &&
+        normalizeColumnName(excelState.lockedColumn) ===
+            normalizeColumnName(columnName);
+
+    return persistLockedColumnToBackend(
+        isSameColumn ? "" : columnName
+    );
 
 }
 
@@ -1641,7 +1922,7 @@ async function handleColumnLockSelection(
     }
 
 
-    await persistLockedColumnToBackend(
+    await toggleLockedColumn(
         selectedColumn
     );
 
@@ -2072,7 +2353,7 @@ function createSpeechRecognition() {
 
 
     instance.lang =
-        "en-US";
+        "en-IN";
 
 
     instance.continuous =
@@ -2080,14 +2361,89 @@ function createSpeechRecognition() {
 
 
     instance.interimResults =
-        false;
+           true;
 
 
     instance.maxAlternatives =
-        3;
-
+        5;
 
     return instance;
+
+}
+
+
+async function sendLocalAudioChunk(blob) {
+
+    if (!localVoiceFallbackActive || !blob.size) {
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("audio", blob, "voice.webm");
+
+    try {
+        const response = await fetch(
+            `${API_URL}/transcribe-audio`,
+            {
+                method: "POST",
+                body: formData
+            }
+        );
+        const data = await response.json();
+
+        if (response.ok && data.text) {
+            await queueVoiceCommand(data.text);
+        }
+    } catch (error) {
+        console.error("Local voice fallback error:", error);
+        setTextSafe(responseStatus, "Local voice backend error");
+    }
+
+}
+
+
+async function startLocalVoiceFallback() {
+
+    if (
+        localVoiceFallbackActive ||
+        !navigator.mediaDevices?.getUserMedia
+    ) {
+        return;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+            ? "audio/webm;codecs=opus"
+            : "audio/webm";
+
+        localVoiceRecorder = new MediaRecorder(stream, { mimeType });
+        localVoiceFallbackActive = true;
+        localVoiceRecorder.ondataavailable = event => sendLocalAudioChunk(event.data);
+        localVoiceRecorder.onstart = () => {
+            setTextSafe(voiceStatus, "Listening locally...");
+            setTextSafe(responseStatus, "Speak now");
+        };
+        localVoiceRecorder.start(5000);
+        addAlert("Online speech service unavailable. Local voice mode started.", "warning");
+    } catch (error) {
+        console.error("Local microphone error:", error);
+        setTextSafe(responseStatus, "Microphone permission required");
+        addAlert("Allow microphone access and try again.", "error");
+    }
+
+}
+
+
+function stopLocalVoiceFallback() {
+
+    localVoiceFallbackActive = false;
+
+    if (localVoiceRecorder) {
+        localVoiceRecorder.stream.getTracks().forEach(track => track.stop());
+        localVoiceRecorder.stop();
+        localVoiceRecorder = null;
+    }
 
 }
 
@@ -2141,6 +2497,62 @@ function stopListeningAnimation() {
 }
 
 
+function selectBestTranscript(result) {
+
+    const candidates = [];
+
+    for (
+        let index = 0;
+        index < result.length;
+        index += 1
+    ) {
+        const transcript = normalizeText(
+            result[index]?.transcript
+        );
+
+        if (transcript) {
+            candidates.push(transcript);
+        }
+    }
+
+    if (candidates.length <= 1) {
+        return candidates[0] || "";
+    }
+
+    const commandWords =
+        /\b(roll|role|marks?|assignment|assign|quiz|quize|test|presentation|present|midterm|final|stop|exit|unlock|clear)\b/gi;
+
+    return candidates
+        .map((candidate, index) => {
+            const normalized = candidate.toLowerCase();
+            let score = 0;
+
+            score += (normalized.match(commandWords) || []).length * 4;
+            score += (normalized.match(/\d+/g) || []).length * 3;
+
+            if (/\b(roll|role)\b/.test(normalized)) {
+                score += 5;
+            }
+
+            if (/\bmarks?\b/.test(normalized)) {
+                score += 5;
+            }
+
+            if (/\b(stop|exit|unlock|clear)\b/.test(normalized)) {
+                score += 10;
+            }
+
+            score -= Math.max(0, candidate.length - 80) / 10;
+            score -= index * 0.1;
+
+            return { candidate, score };
+        })
+        .sort((left, right) => right.score - left.score)[0]
+        .candidate;
+
+}
+
+
 /* ==========================================================
    VOICE COMMAND
 ========================================================== */
@@ -2189,7 +2601,7 @@ function shouldStopListening(
             .trim();
 
 
-    return /^(?:please\s+)?(?:stop|exit)$/
+    return /^(?:please\s+)?(?:stop|exit|unlock|clear|release|cancel|close\s+(?:microphone|mic|listening)|stop\s+listening|turn\s+off\s+(?:microphone|mic))$/
         .test(commandText);
 
 }
@@ -2199,6 +2611,18 @@ async function processVoiceText(text) {
 
     const listeningSessionActive =
         continuousListeningActive;
+
+    const commandRequestsStop =
+        shouldStopListening(text);
+
+    if (
+        listeningSessionActive &&
+        commandRequestsStop
+    ) {
+
+        stopContinuousMode();
+
+    }
 
 
     setTextSafe(
@@ -2293,22 +2717,6 @@ async function processVoiceText(text) {
 
 
         if (
-            data.selected_column ||
-            data.column
-        ) {
-
-            syncLockedColumn(
-                data.selected_column ||
-                data.column,
-                {
-                    showMessage: true
-                }
-            );
-
-        }
-
-
-        if (
             data.updated &&
             data.message
         ) {
@@ -2349,6 +2757,11 @@ async function processVoiceText(text) {
                 response,
                 data
             );
+
+
+        if (!commandError && (data.updated || data.updated_count > 0)) {
+            updateLiveStudentMarks(data);
+        }
 
 
         addAlert(
@@ -2394,9 +2807,19 @@ async function processVoiceText(text) {
 
 
         const shouldRefreshAfterCommand =
-            shouldStopListening(
-                text
-            );
+            commandRequestsStop;
+
+
+        if (
+            listeningSessionActive &&
+            !shouldRefreshAfterCommand
+        ) {
+
+            continuousListeningActive = true;
+            syncMicButtonState();
+            scheduleRecognitionRestart();
+
+        }
 
 
         if (
@@ -2410,16 +2833,8 @@ async function processVoiceText(text) {
             stopContinuousMode();
 
 
-            /*
-             * Refresh database students
-             * after voice command.
-             */
-
-            await refreshDatabaseDashboard();
-
-
             showToast(
-                "Dashboard refreshed.",
+                "Voice listening stopped.",
                 "success"
             );
 
@@ -2491,7 +2906,16 @@ async function processVoiceText(text) {
 
 
         continuousListeningActive =
-            false;
+            listeningSessionActive &&
+            !commandRequestsStop;
+
+
+        if (
+            listeningSessionActive &&
+            !commandRequestsStop
+        ) {
+            scheduleRecognitionRestart();
+        }
 
 
         updateVoiceStatusCard();
@@ -2500,12 +2924,66 @@ async function processVoiceText(text) {
 
 }
 
+function queueVoiceCommand(text) {
+    voiceCommandQueue = voiceCommandQueue
+        .then(() => processVoiceText(text))
+        .catch(error => console.error("Voice command queue error:", error));
+    return voiceCommandQueue;
+}
+
 
 /* ==========================================================
    CONTINUOUS VOICE MODE
 ========================================================== */
 
+function scheduleRecognitionRestart() {
+
+    if (
+        !continuousListeningActive ||
+        !recognition
+    ) {
+        return;
+    }
+
+    if (recognitionRestartTimer) {
+        clearTimeout(recognitionRestartTimer);
+    }
+
+    recognitionRestartTimer = setTimeout(
+        () => {
+
+            recognitionRestartTimer = null;
+
+            if (
+                !continuousListeningActive
+            ) {
+                return;
+            }
+
+            try {
+
+                recognition.start();
+
+            } catch (error) {
+
+                scheduleRecognitionRestart();
+
+            }
+
+        },
+        300
+    );
+
+}
+
+
 async function startContinuousMode() {
+
+    if (!isTeacherLoggedIn()) {
+        setVoiceAccess(false);
+        window.location.href = "login.html";
+        return;
+    }
 
     if (continuousListeningActive) {
         return;
@@ -2570,6 +3048,8 @@ async function startContinuousMode() {
             const finalTranscripts =
                 [];
 
+            let interimTranscript = "";
+
 
             for (
                 let index = event.resultIndex;
@@ -2580,24 +3060,39 @@ async function startContinuousMode() {
                 const result =
                     event.results[index];
 
+                const liveTranscript =
+                    normalizeText(result[0]?.transcript);
 
                 if (
-                    result.isFinal &&
-                    result[0].transcript.trim()
+                    !result.isFinal &&
+                    liveTranscript
                 ) {
+                    interimTranscript += `${liveTranscript} `;
+                }
 
-                    finalTranscripts.push(
-                        result[0].transcript.trim()
-                    );
+
+                if (result.isFinal) {
+
+                    const transcript =
+                        selectBestTranscript(result);
+
+                    if (transcript) {
+                        finalTranscripts.push(transcript);
+                    }
 
                 }
 
             }
 
+            if (interimTranscript.trim()) {
+                setTextSafe(liveText, interimTranscript.trim());
+                setTextSafe(voiceStatus, "Hearing voice...");
+            }
+
 
             finalTranscripts.forEach(
                 text =>
-                    processVoiceText(text)
+                        queueVoiceCommand(text)
             );
 
         };
@@ -2605,6 +3100,16 @@ async function startContinuousMode() {
 
     recognition.onerror =
         event => {
+
+            warningMessage =
+                `Microphone: ${event.error}`;
+
+            setTextSafe(
+                responseStatus,
+                event.error === "not-allowed"
+                    ? "Microphone permission denied"
+                    : `Microphone ${event.error}`
+            );
 
             if (
                 event.error !== "no-speech" &&
@@ -2625,27 +3130,41 @@ async function startContinuousMode() {
 
             }
 
+            if (event.error === "network") {
+                continuousListeningActive = true;
+                syncMicButtonState();
+                try {
+                    recognition.stop();
+                } catch (error) {
+                    // Recognition is already stopped.
+                }
+                startLocalVoiceFallback();
+            }
+
         };
 
 
     recognition.onend =
         () => {
 
-            if (
-                continuousListeningActive
-            ) {
-
-                try {
-
-                    recognition.start();
-
-                } catch (error) {
-
-                    // Already active.
-
-                }
-
+            if (localVoiceFallbackActive) {
+                return;
             }
+
+            if (continuousListeningActive) {
+                setTextSafe(voiceStatus, "Listening...");
+            }
+
+            scheduleRecognitionRestart();
+
+        };
+
+
+    recognition.onstart =
+        () => {
+
+            setTextSafe(voiceStatus, "Listening...");
+            setTextSafe(responseStatus, "Speak now");
 
         };
 
@@ -2667,6 +3186,13 @@ function stopContinuousMode() {
 
     continuousListeningActive =
         false;
+
+    stopLocalVoiceFallback();
+
+    if (recognitionRestartTimer) {
+        clearTimeout(recognitionRestartTimer);
+        recognitionRestartTimer = null;
+    }
 
 
     if (recognition) {
@@ -2721,6 +3247,12 @@ function stopContinuousMode() {
 
 
 async function listenVoice() {
+
+    if (!isTeacherLoggedIn()) {
+        setVoiceAccess(false);
+        window.location.href = "login.html";
+        return;
+    }
 
     if (
         !window.SpeechRecognition &&
@@ -2792,6 +3324,9 @@ function closeSidebar() {
 
 function logoutTeacher() {
 
+    stopContinuousMode();
+    setVoiceAccess(false);
+
     localStorage.removeItem(
         "teacher"
     );
@@ -2819,6 +3354,13 @@ async function initializeDashboard() {
      */
 
     loadTeacherInformation();
+
+    if (!isTeacherLoggedIn()) {
+        setVoiceAccess(false);
+        return;
+    }
+
+    setVoiceAccess(true);
 
 
     /*
@@ -2913,11 +3455,14 @@ async function initializeDashboard() {
     updateVoiceStatusCard();
 
 
-    /*
-     * Load students from DATABASE.
-     */
+    await Promise.all([
+        getHealthStatus(),
+        refreshDatabaseDashboard(),
+    ]);
 
-    await refreshDatabaseDashboard();
+    loadSheets().catch(error => {
+        console.error("Sheet records loading error:", error);
+    });
 
 
     if (ENABLE_AUTO_REFRESH) {
@@ -3001,9 +3546,6 @@ micBtn?.addEventListener(
         if (
             continuousListeningActive
         ) {
-
-            stopContinuousMode();
-
             return;
 
         }
@@ -3024,10 +3566,75 @@ refreshBtn?.addEventListener(
     }
 );
 
+saveDraftBtn?.addEventListener("click", () => saveCurrentSheet("draft").catch(error => showToast(error.message, "error")));
+saveSheetBtn?.addEventListener("click", () => saveCurrentSheet("saved").catch(error => showToast(error.message, "error")));
+
+[savedSheetsList, draftSheetsList, deleteSheetsList].forEach(list => {
+    list?.addEventListener("click", event => {
+        const downloadButton = event.target.closest(".sheet-download-btn");
+        const deleteButton = event.target.closest(".sheet-delete-btn");
+        const openButton = event.target.closest(".sheet-open-btn");
+        if (downloadButton) {
+            window.location.href = `${API_URL}/sheets/${currentTeacher.id}/${downloadButton.dataset.sheetId}/download`;
+            return;
+        }
+        const action = deleteButton ? deleteSavedSheet(deleteButton.dataset.sheetId) : openButton ? openSheet(openButton.dataset.sheetId) : null;
+        action?.catch(error => showToast(error.message, "error"));
+    });
+});
+
+function activateSheetView(view) {
+    const viewMap = {
+        saved: "savedSheetView",
+        drafts: "draftSheetView",
+        manage: "manageSheetView"
+    };
+    sheetTabs.forEach(tab => {
+        const isActive = tab.dataset.sheetView === view;
+        tab.classList.toggle("active", isActive);
+        tab.setAttribute("aria-selected", String(isActive));
+    });
+    Object.values(viewMap).forEach(id => {
+        document.getElementById(id)?.classList.toggle("active", id === viewMap[view]);
+    });
+}
+
+sheetTabs.forEach(tab => {
+    tab.addEventListener("click", () => activateSheetView(tab.dataset.sheetView));
+});
+
+document.querySelectorAll('.menu a[href="#savedSheets"]').forEach(link => {
+    link.addEventListener("click", () => activateSheetView("saved"));
+});
+document.querySelectorAll('.menu a[href="#draftSheets"]').forEach(link => {
+    link.addEventListener("click", () => activateSheetView("drafts"));
+});
+document.querySelectorAll('.menu a[href="#deleteSheets"]').forEach(link => {
+    link.addEventListener("click", () => activateSheetView("manage"));
+});
+
 
 excelFileInput?.addEventListener(
     "change",
     handleExcelUpload
+);
+
+
+studentTableHeadRow?.addEventListener(
+    "click",
+    event => {
+        const headerCell = event.target.closest(
+            "th.lockable-column"
+        );
+
+        if (!headerCell) {
+            return;
+        }
+
+        toggleLockedColumn(
+            headerCell.dataset.columnName
+        );
+    }
 );
 
 
@@ -3057,3 +3664,11 @@ window.addEventListener(
     "DOMContentLoaded",
     initializeDashboard
 );
+
+
+downloadExcelBtn?.addEventListener(
+    "click",
+    downloadFinalExcel
+);
+
+

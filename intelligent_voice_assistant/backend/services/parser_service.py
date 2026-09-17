@@ -7,16 +7,20 @@ except ModuleNotFoundError:  # pragma: no cover
 
 
 VALID_COLUMNS = [
+    "quiz",
     "assignment",
     "test",
+    "presentation",
     "midterm",
     "final",
     "finalterm"
 ]
 
 COLUMN_ALIASES = {
+    "quiz": ["quiz", "quize", "quizzes", "quiz column"],
     "assignment": ["assignment", "assign", "assignment column"],
-    "test": ["test", "quiz", "quizzes", "test column"],
+    "test": ["test", "test column"],
+    "presentation": ["presentation", "presentation column"],
     "midterm": ["midterm", "mid term", "mid-term", "mid"],
     "final": ["final", "final term", "final-term", "finalterm", "finals"],
     "finalterm": ["finalterm", "final term", "final-term", "final", "finals"]
@@ -112,12 +116,43 @@ COMMON_SPELLING_FIXES = {
     "fianl": "final",
     "quizes": "quiz",
     "quizz": "quiz",
+    "qiz": "quiz",
+    "queez": "quiz",
     "tets": "test",
     "tes": "test",
+    "tests": "test",
+    "present": "presentation",
+    "presention": "presentation",
+    "presentaion": "presentation",
+    "presenation": "presentation",
+    "presnetation": "presentation",
+    "presntation": "presentation",
+    "presantation": "presentation",
     "midetm": "midterm",
     "fanal": "final",
     "assinment": "assignment"
 }
+
+COMMON_COMMAND_WORDS = {
+    "number": "no",
+    "num": "no",
+    "maks": "marks",
+    "mark": "marks",
+    "score": "marks",
+    "scored": "marks",
+    "update": "marks",
+    "updated": "marks",
+    "enter": "marks",
+    "add": "marks",
+}
+
+
+def normalize_spoken_roll(value: str):
+    compact = re.sub(r"\s+", "", value).upper()
+    match = re.fullmatch(r"(\d{2})BSIT-?(\d{1,2})", compact)
+    if match:
+        return f"{match.group(1)}BSIT-{int(match.group(2)):02d}"
+    return compact
 
 
 def normalize_number_words(text: str) -> str:
@@ -144,6 +179,8 @@ def normalize_voice_text(text: str) -> str:
     normalized = text.lower().strip()
     for wrong, correct in COMMON_SPELLING_FIXES.items():
         normalized = re.sub(rf"\b{re.escape(wrong)}\b", correct, normalized)
+    for spoken, correct in COMMON_COMMAND_WORDS.items():
+        normalized = re.sub(rf"\b{re.escape(spoken)}\b", correct, normalized)
     return normalized
 
 
@@ -177,11 +214,18 @@ def extract_marks_pair(text: str):
     if not re.search(r"\broll\b|\bmarks?\b|\bka\b|\bkar\b|\bdo\b", normalized):
         return None
 
-    roll_match = re.search(r"\broll\b(?:\s*(?:no|number))?\s*(\d+)", normalized)
+    roll_match = re.search(
+        r"\broll\b(?:\s*(?:no|number))?\s*((?:\d+\s*bsit\s*[- ]?\s*\d+)|\d+)",
+        normalized,
+    )
     marks_match = re.search(r"\bmarks?\b\s*(\d+)", normalized)
 
     if roll_match and marks_match:
-        return int(roll_match.group(1)), int(marks_match.group(1))
+        roll_number = normalize_spoken_roll(roll_match.group(1))
+        return (
+            int(roll_number) if roll_number.isdigit() else roll_number,
+            int(marks_match.group(1)),
+        )
 
     values = extract_numeric_values(normalized)
     if len(values) >= 2:
@@ -193,7 +237,10 @@ def extract_marks_pair(text: str):
 def extract_row_wise_marks(text: str):
     """Extract several column marks for one roll number from a single command."""
     normalized = normalize_voice_text(normalize_number_words(text.lower().strip()))
-    roll_match = re.search(r"\broll\b(?:\s*(?:no|number))?\s*(\d+)", normalized)
+    roll_match = re.search(
+        r"\broll\b(?:\s*(?:no|number))?\s*((?:\d+\s*bsit\s*[- ]?\s*\d+)|\d+)",
+        normalized,
+    )
     if not roll_match:
         return []
 
@@ -212,7 +259,11 @@ def extract_row_wise_marks(text: str):
         if match:
             entries.append({
                 "type": "marks",
-                "roll_no": int(roll_match.group(1)),
+                "roll_no": (
+                    int(roll_match.group(1))
+                    if roll_match.group(1).isdigit()
+                    else normalize_spoken_roll(roll_match.group(1))
+                ),
                 "marks": int(match.group(1)),
                 "column": column,
             })
@@ -263,7 +314,6 @@ def _parse_single_command(text: str):
 
     row_wise_entries = extract_row_wise_marks(text)
     if len(row_wise_entries) > 1:
-        set_current_column(row_wise_entries[-1]["column"])
         return {
             "type": "marks",
             "roll_no": row_wise_entries[0]["roll_no"],
@@ -275,11 +325,23 @@ def _parse_single_command(text: str):
 
     marks_pair = extract_marks_pair(text)
 
+    if not marks_pair and column:
+        roll_match = re.search(
+            r"\broll\b(?:\s*(?:no|number))?\s*((?:\d+\s*bsit\s*[- ]?\s*\d+)|\d+)",
+            text,
+        )
+        marks_match = re.search(r"\bmarks?\b\s*(\d+)", text)
+        if roll_match and marks_match:
+            raw_roll = roll_match.group(1)
+            marks_pair = (
+                int(raw_roll) if raw_roll.isdigit() else normalize_spoken_roll(raw_roll),
+                int(marks_match.group(1)),
+            )
+
     if marks_pair:
         roll_no, marks = marks_pair
         resolved_column = column if column else active_column
         if resolved_column:
-            set_current_column(resolved_column)
             return {
                 "type": "marks",
                 "roll_no": roll_no,
@@ -294,17 +356,17 @@ def _parse_single_command(text: str):
         }
 
     if column and has_selection_word:
-        set_current_column(column)
         return {
-            "type": "column",
-            "column": column
+            "type": "voice_column_ignored",
+            "column": column,
+            "message": "Voice column selection is disabled. Say roll number, assessment, and marks together."
         }
 
     if column:
-        set_current_column(column)
         return {
-            "type": "column",
-            "column": column
+            "type": "voice_column_ignored",
+            "column": column,
+            "message": "Voice column selection is disabled. Say roll number, assessment, and marks together."
         }
 
     return {

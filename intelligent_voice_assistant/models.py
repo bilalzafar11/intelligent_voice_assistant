@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, ForeignKey  # type: ignore[import-not-found]
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime  # type: ignore[import-not-found]
 from sqlalchemy.orm import relationship  # type: ignore[import-not-found]
+from datetime import datetime
 
 from database import Base
 
@@ -67,3 +68,19 @@ class Mark(Base):
 
     student = relationship("Student", back_populates="marks")
     subject = relationship("Subject", back_populates="marks")
+
+
+class MarksSheet(Base):
+    __tablename__ = "marks_sheets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    teacher_id = Column(Integer, ForeignKey("teachers.id"), nullable=False, index=True)
+    subject_id = Column(Integer, ForeignKey("subjects.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="draft", index=True)
+    rows_json = Column(Text, nullable=False, default="[]")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    teacher = relationship("Teacher")
+    subject = relationship("Subject")

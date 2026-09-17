@@ -65,16 +65,23 @@
                     </li>
 
                     <li>
-                        <a href="#students">
-                            <i class="fa-solid fa-user-graduate"></i>
-                            <span>Students</span>
+                        <a href="#savedSheets">
+                            <i class="fa-solid fa-folder-open"></i>
+                            <span>Saved Sheets</span>
                         </a>
                     </li>
 
                     <li>
-                        <a href="#voiceAssistant">
-                            <i class="fa-solid fa-microphone"></i>
-                            <span>Voice Assistant</span>
+                        <a href="#draftSheets">
+                            <i class="fa-solid fa-file-pen"></i>
+                            <span>Drafts</span>
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="#deleteSheets">
+                            <i class="fa-solid fa-trash"></i>
+                            <span>Delete Sheets</span>
                         </a>
                     </li>
 
@@ -113,98 +120,6 @@
     <main class="main">
 
         <!-- =================================================
-             TOPBAR
-        ================================================== -->
-
-        <header class="topbar">
-
-            <div class="topbar-left">
-
-                <button
-                    class="menu-toggle"
-                    id="sidebarToggle"
-                    aria-label="Toggle menu">
-
-                    <i class="fa-solid fa-bars"></i>
-
-                </button>
-
-                <div class="topbar-title">
-
-                    <h1>
-                        Intelligent Voice Assistant
-                    </h1>
-
-                    <span>
-                        Voice-controlled student marks management
-                    </span>
-
-                </div>
-
-            </div>
-
-
-            <!-- Teacher / Subject Information -->
-
-            <div class="topbar-right">
-
-                <div class="session-info">
-
-                    <div class="session-icon">
-                        <i class="fa-solid fa-user-tie"></i>
-                    </div>
-
-                    <div>
-                        <span class="session-label">
-                            Teacher
-                        </span>
-
-                        <strong id="teacherName">
-                            Teacher
-                        </strong>
-                    </div>
-
-                </div>
-
-
-                <div class="session-info">
-
-                    <div class="session-icon">
-                        <i class="fa-solid fa-book"></i>
-                    </div>
-
-                    <div>
-                        <span class="session-label">
-                            Subject
-                        </span>
-
-                        <strong id="currentSubject">
-                            --
-                        </strong>
-                    </div>
-
-                </div>
-
-
-                <button
-                    class="logout-btn"
-                    id="logoutBtn"
-                    title="Logout">
-
-                    <i class="fa-solid fa-right-from-bracket"></i>
-
-                    <span>
-                        Logout
-                    </span>
-
-                </button>
-
-            </div>
-
-        </header>
-
-
-        <!-- =================================================
              CONTENT
         ================================================== -->
 
@@ -218,20 +133,31 @@
             <div class="left-section">
 
 
-                <!-- SUBJECT INFORMATION -->
+                <!-- =============================================
+                     PAGE HEADER  (Current Subject + Session)
+                ============================================== -->
 
-                <div class="card subject-info-card">
+                <header class="card subject-info-card">
 
                     <div class="subject-info-left">
+
+                        <button
+                            class="menu-toggle"
+                            id="sidebarToggle"
+                            aria-label="Toggle menu">
+
+                            <i class="fa-solid fa-bars"></i>
+
+                        </button>
 
                         <div class="subject-large-icon">
                             <i class="fa-solid fa-book-open"></i>
                         </div>
 
-                        <div>
+                        <div class="subject-heading">
 
                             <span class="small-label">
-                                CURRENT SUBJECT
+                                Current Subject
                             </span>
 
                             <h2 id="subjectTitle">
@@ -242,22 +168,73 @@
                                 Academic information
                             </p>
 
+                            <span class="sr-only" id="currentSubject">--</span>
+
                         </div>
 
                     </div>
 
 
-                    <div class="subject-status">
+                    <!-- Session / Status Strip -->
 
-                        <span class="status-dot"></span>
+                    <div class="header-meta">
 
-                        <span>
-                            Active Session
-                        </span>
+                        <div class="meta-chip">
+
+                            <div class="meta-icon">
+                                <i class="fa-solid fa-microphone"></i>
+                            </div>
+
+                            <div class="meta-text">
+                                <span>Microphone</span>
+                                <strong id="microphoneStatusValue">Ready</strong>
+                            </div>
+
+                        </div>
+<div class="meta-chip meta-chip-warning">
+
+                            <div class="meta-icon">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </div>
+
+                            <div class="meta-text">
+                                <span>Errors / Warnings</span>
+                                <strong id="statusWarningValue">No warnings</strong>
+                            </div>
+
+                        </div>
+
+
+                        <span class="meta-divider"></span>
+
+
+                        <div class="meta-chip meta-chip-user">
+
+                            <div class="meta-icon">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+
+                            <div class="meta-text">
+                                <span>Teacher</span>
+                                <strong id="teacherName">Teacher</strong>
+                            </div>
+
+                        </div>
+
+
+                        <button
+                            class="logout-btn"
+                            id="logoutBtn"
+                            title="Logout"
+                            aria-label="Logout">
+
+                            <i class="fa-solid fa-right-from-bracket"></i>
+
+                        </button>
 
                     </div>
 
-                </div>
+                </header>
 
 
                 <!-- =============================================
@@ -273,13 +250,10 @@
                         <div>
 
                             <h2>
-                                <i class="fa-solid fa-microphone"></i>
-                                Voice Assistant
+                                <i class="fa-solid fa-wave-square"></i>
+                                Live Speech
                             </h2>
 
-                            <p>
-                                Enter marks using natural voice commands
-                            </p>
 
                         </div>
 
@@ -288,42 +262,34 @@
 
                     <div class="voice-area">
 
-                        <button
-                            class="mic-button"
-                            id="micBtn"
-                            aria-label="Start voice input"
-                            aria-pressed="false">
+                        <div class="mic-column">
 
-                            <i class="fa-solid fa-microphone"></i>
+                            <button
+                                class="mic-button"
+                                id="micBtn"
+                                aria-label="Start voice input"
+                                aria-pressed="false">
 
-                        </button>
+                                <i class="fa-solid fa-microphone"></i>
+
+                            </button>
+
+                            <span class="mic-caption">
+                                Click to Start
+                            </span>
+
+                        </div>
 
 
                         <div class="voice-copy">
 
-                            <h2>
-                                Click Microphone
-                            </h2>
-
-                            <p>
-                                First say a column like
-                                <strong>"Assignment"</strong>
-                                or
-                                <strong>"Midterm"</strong>.
-                                Then say:
-                                <strong>"roll number 1 marks 85"</strong>
-                            </p>
-
-
-                            <div class="voice-hint">
-
-                                <i class="fa-solid fa-circle-info"></i>
-
-                                <span>
-                                    Speak clearly for better recognition
-                                </span>
-
+                            <div class="live-text-box">
+                                <p id="liveText">
+                                    Waiting for your voice...
+                                </p>
                             </div>
+
+
 
                         </div>
 
@@ -350,7 +316,7 @@
                             </h2>
 
                             <p>
-                                Students loaded directly from SQLite database
+                                Students loaded from SQLite database
                             </p>
 
                         </div>
@@ -359,7 +325,7 @@
                         <div class="table-actions">
 
                             <button
-                                class="refresh-btn"
+                                class="refresh-btn btn-outline"
                                 id="refreshBtn"
                                 title="Refresh students from database">
 
@@ -369,19 +335,27 @@
 
                             </button>
 
+                            <button
+                                class="refresh-btn btn-success"
+                                id="downloadExcelBtn"
+                                title="Download final marks Excel sheet">
+
+                                <i class="fa-solid fa-file-excel"></i>
+
+                                Download Excel
+
+                            </button>
+
                         </div>
 
                     </div>
 
 
                     <!-- Dynamic Column Selection -->
-
-                    <div
-                        class="column-selection-panel"
-                        id="columnSelectionPanel"
-                        aria-label="Column selection panel">
-
-                    </div>
+                    <div class="column-lock-hint"><span class="lock-hint-icon">🔒</span><span><strong>Column Lock:</strong> Click any button below to lock that column for marks entry.</span></div>
+                    <div class="column-selection-panel" id="columnSelectionPanel"
+                            role="group"
+                            aria-label="Column selection buttons"></div>
 
 
                     <!-- Student Table -->
@@ -443,270 +417,130 @@
 
 
             <!-- =================================================
-                 RIGHT SECTION
+                 MY SHEETS  (bottom section)
             ================================================== -->
 
-            <div class="right-section">
+            <div class="card sheet-manager-card" id="savedSheets">
 
+                <div class="card-header">
 
-                <!-- VOICE STATUS -->
+                    <div>
 
-                <div class="card workflow-card voice-status-panel">
-
-                    <div class="card-header">
-
-                        <h2>
-                            <i class="fa-solid fa-waveform-lines"></i>
-                            Voice Status
-                        </h2>
-
-                    </div>
-
-
-                    <div class="voice-status-grid">
-
-                        <div class="voice-status-row">
-
-                            <span>
-                                🎤 Microphone Status
-                            </span>
-
-                            <strong id="microphoneStatusValue">
-                                Ready
-                            </strong>
-
-                        </div>
-
-
-                        <div class="voice-status-row">
-
-                            <span>
-                                🔒 Locked Column
-                            </span>
-
-                            <strong id="lockedColumnValue">
-                                Not Locked
-                            </strong>
-
-                        </div>
-
-
-                        <div class="voice-status-row">
-
-                            <span>
-                                👤 Current Roll Number
-                            </span>
-
-                            <strong id="currentRollValue">
-                                --
-                            </strong>
-
-                        </div>
-
-
-                        <div class="voice-status-row">
-
-                            <span>
-                                ✅ Last Updated Marks
-                            </span>
-
-                            <strong id="lastUpdatedMarksValue">
-                                --
-                            </strong>
-
-                        </div>
-
-
-                        <div class="voice-status-row warning-row">
-
-                            <span>
-                                ⚠️ Errors or Warnings
-                            </span>
-
-                            <strong id="statusWarningValue">
-                                No warnings
-                            </strong>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <!-- LIVE SPEECH -->
-
-                <div class="card workflow-card live-speech-panel">
-
-                    <div class="card-header">
+                        <span class="small-label">Records</span>
 
                         <h2>
-                            <i class="fa-solid fa-wave-square"></i>
-                            Live Speech
+                            <i class="fa-solid fa-folder-open"></i>
+                            My Sheets
                         </h2>
 
-                    </div>
-
-
-                    <div class="live-text-box">
-
-                        <p id="liveText">
-                            Waiting for voice input...
+                        <p id="sheetManagerSubject">
+                            Organize saved marks and drafts for this subject
                         </p>
 
                     </div>
 
-                </div>
 
+                    <div class="table-actions">
 
-                <!-- PARSED COMMAND -->
+                        <button
+                            class="refresh-btn btn-outline"
+                            id="saveDraftBtn"
+                            title="Save current marks as draft">
 
-                <div class="card workflow-card parsed-command-panel">
+                            <i class="fa-solid fa-file-pen"></i>
 
-                    <div class="card-header">
+                            Save Draft
 
-                        <h2>
-                            <i class="fa-solid fa-terminal"></i>
-                            Parsed Command
-                        </h2>
+                        </button>
 
-                    </div>
+                        <button
+                            class="refresh-btn btn-success"
+                            id="saveSheetBtn"
+                            title="Save current marks sheet">
 
+                            <i class="fa-solid fa-floppy-disk"></i>
 
-                    <div class="command-grid">
+                            Save Sheet
 
-                        <div class="command-box">
-
-                            <span>
-                                Roll Number
-                            </span>
-
-                            <h2 id="rollNo">
-                                --
-                            </h2>
-
-                        </div>
-
-
-                        <div class="command-box">
-
-                            <span>
-                                Subject
-                            </span>
-
-                            <h2 id="subjectName">
-                                --
-                            </h2>
-
-                        </div>
-
-
-                        <div class="command-box">
-
-                            <span>
-                                Marks
-                            </span>
-
-                            <h2 id="marksValue">
-                                --
-                            </h2>
-
-                        </div>
+                        </button>
 
                     </div>
 
                 </div>
 
 
-                <!-- NOTIFICATIONS -->
+                <div class="sheet-tabs" role="tablist" aria-label="Sheet records">
 
-                <div class="card notification-card">
+                    <button
+                        class="sheet-tab active"
+                        data-sheet-view="saved"
+                        role="tab"
+                        aria-selected="true">
 
-                    <div class="card-header">
+                        <i class="fa-solid fa-circle-check"></i>
+                        Saved Sheets
+                        <span id="savedSheetCount">0</span>
 
-                        <h2>
-                            <i class="fa-solid fa-bell"></i>
-                            Notifications
-                        </h2>
+                    </button>
 
-                    </div>
+                    <button
+                        class="sheet-tab"
+                        data-sheet-view="drafts"
+                        role="tab"
+                        aria-selected="false">
 
+                        <i class="fa-solid fa-file-pen"></i>
+                        Drafts
+                        <span id="draftSheetCount">0</span>
 
-                    <div id="alertContainer">
+                    </button>
 
-                        <div class="success-alert">
+                    <button
+                        class="sheet-tab"
+                        data-sheet-view="manage"
+                        role="tab"
+                        aria-selected="false">
 
-                            <i class="fa-solid fa-circle-check"></i>
+                        <i class="fa-solid fa-sliders"></i>
+                        Manage Sheets
 
-                            <span>
-                                System Ready
-                            </span>
-
-                        </div>
-
-                    </div>
+                    </button>
 
                 </div>
 
 
-                <!-- QUICK INFORMATION -->
+                <div class="sheet-view active" id="savedSheetView">
 
-                <div class="card quick-info-card">
-
-                    <div class="card-header">
-
-                        <h2>
-                            <i class="fa-solid fa-circle-info"></i>
-                            System Information
-                        </h2>
-
+                    <div class="sheet-list-heading">
+                        <strong>Saved marks sheets</strong>
+                        <span>Open or download a completed record</span>
                     </div>
 
+                    <div id="savedSheetsList" class="sheet-list">Loading...</div>
 
-                    <div class="quick-info-list">
-
-                        <div>
-
-                            <span>
-                                <i class="fa-solid fa-database"></i>
-                                Data Source
-                            </span>
-
-                            <strong>
-                                SQLite Database
-                            </strong>
-
-                        </div>
+                </div>
 
 
-                        <div>
+                <div class="sheet-view" id="draftSheetView">
 
-                            <span>
-                                <i class="fa-solid fa-microphone"></i>
-                                Speech Engine
-                            </span>
-
-                            <strong>
-                                Whisper
-                            </strong>
-
-                        </div>
-
-
-                        <div>
-
-                            <span>
-                                <i class="fa-solid fa-bolt"></i>
-                                Status
-                            </span>
-
-                            <strong>
-                                Online
-                            </strong>
-
-                        </div>
-
+                    <div class="sheet-list-heading">
+                        <strong>Work in progress</strong>
+                        <span>Continue editing a draft whenever you are ready</span>
                     </div>
+
+                    <div id="draftSheetsList" class="sheet-list">Loading...</div>
+
+                </div>
+
+
+                <div class="sheet-view" id="manageSheetView">
+
+                    <div class="sheet-list-heading">
+                        <strong>Manage records</strong>
+                        <span>Delete a sheet permanently</span>
+                    </div>
+
+                    <div id="deleteSheetsList" class="sheet-list">Loading...</div>
 
                 </div>
 
@@ -747,7 +581,7 @@
          MAIN JAVASCRIPT
     ======================================================= -->
 
-    <script src="script.js"></script>
+    <script src="script.js?v=20260917-2"></script>
 
 
     <!-- =====================================================
@@ -760,14 +594,14 @@
          * Teacher information comes from login.
          */
 
-        const teacherData =
+        const teacherSessionData =
             localStorage.getItem("teacher");
 
 
-        if (teacherData) {
+        if (teacherSessionData) {
 
             const teacher =
-                JSON.parse(teacherData);
+                JSON.parse(teacherSessionData);
 
             const teacherName =
                 document.getElementById("teacherName");

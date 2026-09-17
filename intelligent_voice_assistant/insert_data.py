@@ -1,102 +1,90 @@
 from database import SessionLocal
-from models import Teacher, Subject, Student
+from models import Subject, Teacher
 
-db = SessionLocal()
 
-# =========================
-# 3 Teachers
-# =========================
-
-teacher1 = Teacher(
-    teacher_id="T001",
-    name="Sir Imran",
-    email="imran@example.com",
-    password="123456"
-)
-
-teacher2 = Teacher(
-    teacher_id="T002",
-    name="Ma'am Fatima",
-    email="fatima@example.com",
-    password="123456"
-)
-
-teacher3 = Teacher(
-    teacher_id="T003",
-    name="Sir Manzar",
-    email="manzar@example.com",
-    password="123456"
-)
-
-db.add_all([teacher1, teacher2, teacher3])
-db.commit()
-
-# =========================
-# Subjects
-# =========================
-
-subjects = [
-    Subject(
-        subject_name="Database Systems",
-        semester=4,
-        year="2nd Year",
-        teacher_id=teacher1.id
-    ),
-    Subject(
-        subject_name="Cyber Security",
-        semester=8,
-        year="4th Year",
-        teacher_id=teacher1.id
-    ),
-    Subject(
-        subject_name="Software Engineering",
-        semester=7,
-        year="4th Year",
-        teacher_id=teacher1.id
-    ),
-
-    Subject(
-        subject_name="Computer Networking",
-        semester=3,
-        year="2nd Year",
-        teacher_id=teacher2.id
-    ),
-    Subject(
-        subject_name="Data Science",
-        semester=6,
-        year="3rd Year",
-        teacher_id=teacher2.id
-    ),
-    Subject(
-        subject_name="Artificial Intelligence",
-        semester=5,
-        year="3rd Year",
-        teacher_id=teacher2.id
-    ),
-
-    Subject(
-        subject_name="Enterprise Systems",
-        semester=8,
-        year="4th Year",
-        teacher_id=teacher3.id
-    ),
-    Subject(
-        subject_name="Web Engineering",
-        semester=7,
-        year="4th Year",
-        teacher_id=teacher3.id
-    ),
-    Subject(
-        subject_name="Cloud Computing",
-        semester=6,
-        year="3rd Year",
-        teacher_id=teacher3.id
-    )
+TEACHERS = [
+    {
+        "teacher_id": "T001",
+        "name": "Mr. Imran Ali",
+        "email": "imran.ali@example.com",
+        "password": "123456",
+        "subjects": [
+            ("Cybersecurity", "4th Year", 8),
+            ("Database System", "2nd Year", 4),
+            ("Parallel and Distributed Computing", "3rd Year", 6),
+        ],
+    },
+    {
+        "teacher_id": "T002",
+        "name": "Mr. Shahzad Ali",
+        "email": "shahzad.ali@example.com",
+        "password": "123456",
+        "subjects": [
+            ("Human Computer Interaction", "4th Year", 8),
+            ("Visual Programming", "2nd Year", 4),
+            ("Mobile Application Development", "3rd Year", 6),
+        ],
+    },
+    {
+        "teacher_id": "T003",
+        "name": "Mr. Manzar Bashir",
+        "email": "manzar.bashir@example.com",
+        "password": "123456",
+        "subjects": [
+            ("Enterprise Systems", "4th Year", 8),
+            ("Object Oriented Programming Language", "1st Year", 2),
+            ("Software Project Management", "3rd Year", 6),
+        ],
+    },
 ]
 
-db.add_all(subjects)
-db.commit()
 
-print("Teachers and subjects added successfully!")
+def seed_teachers_and_subjects():
+    db = SessionLocal()
 
-db.close()
+    try:
+        db.query(Subject).delete(synchronize_session=False)
+
+        existing_teachers = {
+            teacher.teacher_id: teacher
+            for teacher in db.query(Teacher).all()
+        }
+
+        for teacher_data in TEACHERS:
+            teacher = existing_teachers.get(teacher_data["teacher_id"])
+
+            if teacher is None:
+                teacher = Teacher(teacher_id=teacher_data["teacher_id"])
+                db.add(teacher)
+
+            teacher.name = teacher_data["name"]
+            teacher.email = teacher_data["email"]
+            teacher.password = teacher_data["password"]
+            db.flush()
+
+            db.add_all(
+                Subject(
+                    subject_name=subject_name,
+                    year=year,
+                    semester=semester,
+                    teacher_id=teacher.id,
+                )
+                for subject_name, year, semester in teacher_data["subjects"]
+            )
+
+        valid_teacher_ids = {
+            teacher_data["teacher_id"] for teacher_data in TEACHERS
+        }
+        for teacher_id, teacher in existing_teachers.items():
+            if teacher_id not in valid_teacher_ids:
+                db.delete(teacher)
+
+        db.commit()
+        print("Teachers and subjects seeded successfully.")
+
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    seed_teachers_and_subjects()

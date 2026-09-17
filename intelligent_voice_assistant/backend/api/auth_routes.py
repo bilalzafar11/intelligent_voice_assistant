@@ -11,8 +11,34 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from database import SessionLocal
 from models import Teacher, Subject, Student
+from backend.services.excel_service import read_students
 
 router = fastapi.APIRouter()
+
+
+def _get_mark_value(student: dict, *names: str):
+    normalized_values = {
+        "".join(character for character in str(key).lower() if character.isalnum()): value
+        for key, value in student.items()
+    }
+
+    for name in names:
+        value = normalized_values.get(
+            "".join(character for character in name.lower() if character.isalnum())
+        )
+        if value is not None:
+            return value
+
+    return 0
+
+
+def _excel_student_for_roll(excel_students: dict, roll_no: str):
+    exact = excel_students.get(str(roll_no))
+    if exact is not None:
+        return exact
+
+    suffix = str(roll_no).rsplit("-", 1)[-1].lstrip("0") or "0"
+    return excel_students.get(suffix, {})
 
 
 class LoginRequest(BaseModel):
@@ -122,6 +148,12 @@ def get_subject_students(subject_id: int):
             .all()
         )
 
+        excel_students = {
+            str(student.get("rollNo")): student
+            for student in read_students()
+            if student.get("rollNo") is not None
+        }
+
         return {
             "success": True,
             "subject": {
@@ -134,7 +166,35 @@ def get_subject_students(subject_id: int):
                 {
                     "id": student.id,
                     "roll_no": student.roll_no,
-                    "name": student.name
+                    "name": student.name,
+                    "quiz": _get_mark_value(
+                        _excel_student_for_roll(excel_students, student.roll_no),
+                        "quiz",
+                        "quize",
+                        "quizzes",
+                    ),
+                    "test": _get_mark_value(
+                        _excel_student_for_roll(excel_students, student.roll_no),
+                        "test",
+                    ),
+                    "assignment": _get_mark_value(
+                        _excel_student_for_roll(excel_students, student.roll_no),
+                        "assignment",
+                    ),
+                    "presentation": _get_mark_value(
+                        _excel_student_for_roll(excel_students, student.roll_no),
+                        "presentation",
+                    ),
+                    "midterm": _get_mark_value(
+                        _excel_student_for_roll(excel_students, student.roll_no),
+                        "midterm",
+                    ),
+                    "final": _get_mark_value(
+                        _excel_student_for_roll(excel_students, student.roll_no),
+                        "finalterm",
+                        "final term",
+                        "final",
+                    ),
                 }
                 for student in students
             ]
