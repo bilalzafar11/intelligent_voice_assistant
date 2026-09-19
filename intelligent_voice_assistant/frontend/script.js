@@ -137,6 +137,7 @@ let localVoiceFallbackActive = false;
 
 let continuousListeningActive = false;
 let voiceCommandQueue = Promise.resolve();
+const microphonePersistenceKey = "voiceAssistantListeningActive";
 
 let lastUpdatedMarksText = "--";
 let warningMessage = "No warnings";
@@ -157,6 +158,298 @@ function normalizeColumnName(columnName) {
     return String(columnName || "")
         .toLowerCase()
         .replace(/[^a-z0-9]/g, "");
+
+}
+
+/*
+ * Resolves any spelling/label of a column ("Final Term", "Final",
+ * "final_term", "finalterm" ...) to one canonical key so that
+ * locking logic can compare columns reliably regardless of which
+ * label the table, the column panel, or the backend happen to use.
+ */
+function canonicalColumnKey(columnName) {
+
+    const normalized = normalizeColumnName(columnName);
+
+    if (!normalized) {
+        return "";
+    }
+
+    return MARKS_COLUMN_ALIASES[normalized] || normalized;
+
+}
+
+
+/* ==========================================================
+   MARKS VALIDATION RULES
+   Quiz          -> 1 to 5
+   Test          -> 1 to 10
+   Assignment    -> 1 to 10
+   Presentation  -> 1 to 10
+   Midterm       -> 1 to 40
+   Final Term    -> 1 to 50
+========================================================== */
+
+const MARKS_LIMITS = {
+
+    quiz: {
+        label: "Quiz",
+        ruleLabel: "Quiz",
+        min: 1,
+        max: 5
+    },
+
+    test: {
+        label: "Test",
+        ruleLabel: "Test",
+        min: 1,
+        max: 10
+    },
+
+    assignment: {
+        label: "Assignment",
+        ruleLabel: "Assignment",
+        min: 1,
+        max: 10
+    },
+
+    presentation: {
+        label: "Presentation",
+        ruleLabel: "Presentation",
+        min: 1,
+        max: 10
+    },
+
+    midterm: {
+        label: "Midterm",
+        ruleLabel: "Midterm",
+        min: 1,
+        max: 40
+    },
+
+    final: {
+        label: "Final",
+        ruleLabel: "Final Term",
+        min: 1,
+        max: 50
+    }
+
+};
+
+
+const MARKS_COLUMN_ALIASES = {
+    quiz: "quiz",
+    quize: "quiz",
+    quizz: "quiz",
+    quizes: "quiz",
+    quizzes: "quiz",
+    test: "test",
+    tests: "test",
+    assignment: "assignment",
+    assignments: "assignment",
+    assign: "assignment",
+    presentation: "presentation",
+    presentations: "presentation",
+    present: "presentation",
+    midterm: "midterm",
+    midterms: "midterm",
+    mid: "midterm",
+    midtermexam: "midterm",
+    final: "final",
+    finals: "final",
+    finalterm: "final",
+    finalexam: "final",
+    finaltermexam: "final"
+};
+
+
+const MARKS_SUCCESS_MESSAGE =
+    "\u2705 Valid marks \u2192 Marks updated successfully.";
+
+
+function resolveMarksColumn(columnName) {
+
+    const key = normalizeColumnName(columnName);
+
+    if (!key) {
+        return null;
+    }
+
+    return MARKS_COLUMN_ALIASES[key] ||
+        (MARKS_LIMITS[key] ? key : null);
+
+}
+
+
+function buildInvalidMarksMessage(rule, marks) {
+
+    return `\u274C Invalid ${rule.label} ${marks} \u2192 ` +
+        `${rule.ruleLabel} marks must be between ${rule.min} and ${rule.max}.`;
+
+}
+
+
+/*
+ * Returns { valid, column, rule, value, message }.
+ * Unknown columns are treated as valid so that
+ * non-marks commands keep working exactly as before.
+ */
+
+function validateMarksValue(columnName, marks) {
+
+    const column = resolveMarksColumn(columnName);
+
+    if (!column) {
+        return { valid: true, column: null };
+    }
+
+    const rule = MARKS_LIMITS[column];
+
+    const rawText = String(marks).trim();
+
+    const value = Number(rawText);
+
+
+    const isInvalid =
+        rawText === "" ||
+        !Number.isFinite(value) ||
+        value < rule.min ||
+        value > rule.max;
+
+
+    if (isInvalid) {
+
+        return {
+            valid: false,
+            column,
+            rule,
+            value: rawText,
+            message: buildInvalidMarksMessage(rule, rawText)
+        };
+
+    }
+
+
+    return {
+        valid: true,
+        column,
+        rule,
+        value
+    };
+
+}
+
+
+function detectSpokenColumn(text) {
+
+    const cleaned =
+        " " +
+        String(text || "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, " ")
+            .trim() +
+        " ";
+
+
+    const patterns = [
+        ["final", /\bfinal(\s+term)?\b/],
+        ["midterm", /\b(mid\s*term|midterm|mid)\b/],
+        ["presentation", /\b(presentation|presentations|present)\b/],
+        ["assignment", /\b(assignment|assignments|assign)\b/],
+        ["test", /\btests?\b/],
+        ["quiz", /\b(quiz|quize|quizz|quizes|quizzes)\b/]
+    ];
+
+
+    for (const [column, pattern] of patterns) {
+
+        if (pattern.test(cleaned)) {
+            return column;
+        }
+
+    }
+
+
+    return null;
+
+}
+
+
+/*
+ * Reads the spoken command and validates the marks
+ * before the request is sent to the backend.
+ */
+
+function validateVoiceMarksCommand(text) {
+
+    const cleaned =
+        String(text || "")
+            .toLowerCase()
+            .replace(/[^a-z0-9.]+/g, " ")
+            .trim();
+
+
+    if (!cleaned) {
+        return { valid: true };
+    }
+
+
+    const withoutRoll =
+        cleaned.replace(
+            /\b(roll|role)\s*(number|no|num)?\s*[a-z0-9]*\d+/g,
+            " "
+        );
+
+
+    const column =
+        detectSpokenColumn(cleaned) ||
+        resolveMarksColumn(excelState.lockedColumn);
+
+
+    if (!column) {
+        return { valid: true };
+    }
+
+
+    const marksMatch =
+        withoutRoll.match(
+            /marks?\s*(?:is|are|of|equals?|equal\s+to)?\s*(\d+(?:\.\d+)?)/
+        ) ||
+        withoutRoll.match(
+            new RegExp(
+                "\\b(?:quiz|quize|quizz|test|assignment|assign|" +
+                "presentation|present|mid\\s*term|midterm|mid|" +
+                "final\\s*term|final)\\s*(\\d+(?:\\.\\d+)?)"
+            )
+        );
+
+
+    if (!marksMatch) {
+        return { valid: true };
+    }
+
+
+    return validateMarksValue(column, marksMatch[1]);
+
+}
+
+
+function recalculateRowTotal(row) {
+
+    if (!row) {
+        return;
+    }
+
+    const cells = row.querySelectorAll("td");
+
+    const total = [3, 4, 5, 6, 7, 8].reduce(
+        (sum, index) => sum + (Number(cells[index]?.textContent) || 0),
+        0
+    );
+
+    if (cells[9]) {
+        cells[9].textContent = total;
+    }
 
 }
 
@@ -841,10 +1134,6 @@ async function getHealthStatus() {
    DATABASE STUDENTS
 ========================================================== */
 
-/* ==========================================================
-   DATABASE STUDENTS
-========================================================== */
-
 async function fetchDatabaseStudents() {
 
     if (!selectedSubjectId) {
@@ -1294,11 +1583,11 @@ function updateLiveStudentMarks(data) {
    MAIN DATABASE DASHBOARD REFRESH
 ========================================================== */
 
-async function refreshDatabaseDashboard() {
+async function refreshDatabaseDashboard(showBusy = true) {
 
     try {
 
-        showLoading(true);
+        showLoading(showBusy);
 
 
         const students =
@@ -1359,118 +1648,14 @@ async function refreshDatabaseDashboard() {
 
     } finally {
 
-        showLoading(false);
+        if (showBusy) {
+            showLoading(false);
+        }
 
     }
 
 }
 
-
-/* ==========================================================
-   EXCEL FUNCTIONS
-   Existing Excel functionality preserved
-========================================================== */
-
-function normalizeRowHeaders(rows) {
-
-    const sourceRows =
-        Array.isArray(rows)
-            ? rows
-            : [];
-
-
-    if (!sourceRows.length) {
-        return [];
-    }
-
-
-    const firstRow =
-        sourceRows.find(
-            row =>
-                row &&
-                typeof row === "object" &&
-                Object.keys(row).length > 0
-        );
-
-
-    if (!firstRow) {
-        return [];
-    }
-
-
-    return Object.keys(firstRow)
-        .filter(
-            key =>
-                String(key).trim() !== ""
-        )
-        .map(
-            key =>
-                String(key).trim()
-        )
-        .filter(
-            (key, index, array) =>
-                array.indexOf(key) === index
-        );
-
-}
-
-
-function getRowCellValue(
-    row,
-    header
-) {
-
-    if (
-        !row ||
-        typeof row !== "object"
-    ) {
-
-        return "";
-
-    }
-
-
-    const exactMatch =
-        row[header];
-
-
-    if (
-        exactMatch !== undefined &&
-        exactMatch !== null &&
-        exactMatch !== ""
-    ) {
-
-        return exactMatch;
-
-    }
-
-
-    const normalizedHeader =
-        String(header).trim();
-
-
-    const matchingKey =
-        Object.keys(row).find(
-            key =>
-                String(key)
-                    .trim()
-                    .toLowerCase() ===
-                normalizedHeader.toLowerCase()
-        );
-
-
-    if (
-        matchingKey !== undefined
-    ) {
-
-        return row[matchingKey];
-
-    }
-
-
-    return "";
-
-}
 
 /* ==========================================================
    EXCEL FUNCTIONS
@@ -1603,8 +1788,8 @@ function updateLockedColumnStyles() {
 
         const isLocked =
             excelState.lockedColumn &&
-            normalizeColumnName(columnName) ===
-            normalizeColumnName(excelState.lockedColumn);
+            canonicalColumnKey(columnName) ===
+            canonicalColumnKey(excelState.lockedColumn);
 
 
         button.classList.toggle(
@@ -1637,8 +1822,8 @@ function updateLockedColumnStyles() {
         headerCell.classList.toggle(
             "locked-column",
             Boolean(excelState.lockedColumn) &&
-            normalizeColumnName(columnName) ===
-            normalizeColumnName(excelState.lockedColumn)
+            canonicalColumnKey(columnName) ===
+            canonicalColumnKey(excelState.lockedColumn)
         );
 
     });
@@ -1665,8 +1850,8 @@ function updateLockedColumnStyles() {
             cell.classList.toggle(
                 "locked-column",
                 Boolean(excelState.lockedColumn) &&
-                normalizeColumnName(matchedHeader) ===
-                normalizeColumnName(excelState.lockedColumn)
+                canonicalColumnKey(matchedHeader) ===
+                canonicalColumnKey(excelState.lockedColumn)
             );
 
         });
@@ -1712,8 +1897,8 @@ function syncLockedColumn(
     const matchingHeader =
         headers.find(
             header =>
-                normalizeColumnName(header) ===
-                normalizeColumnName(safeColumnName)
+                canonicalColumnKey(header) ===
+                canonicalColumnKey(safeColumnName)
         );
 
 
@@ -1888,8 +2073,8 @@ function toggleLockedColumn(columnName) {
 
     const isSameColumn =
         excelState.lockedColumn &&
-        normalizeColumnName(excelState.lockedColumn) ===
-            normalizeColumnName(columnName);
+        canonicalColumnKey(excelState.lockedColumn) ===
+            canonicalColumnKey(columnName);
 
     return persistLockedColumnToBackend(
         isSameColumn ? "" : columnName
@@ -2625,6 +2810,101 @@ async function processVoiceText(text) {
     }
 
 
+    /* ==================================================
+       LOCAL MARKS VALIDATION
+       Invalid marks are rejected here and never
+       reach the backend.
+    ================================================== */
+
+    const marksValidation =
+        validateVoiceMarksCommand(text);
+
+
+    if (!marksValidation.valid) {
+
+        setTextSafe(
+            liveText,
+            normalizeText(text) ||
+            "No text recognized."
+        );
+
+
+        setTextSafe(
+            responseStatus,
+            marksValidation.message
+        );
+
+
+        setTextSafe(
+            voiceStatus,
+            "Invalid Marks"
+        );
+
+
+        warningMessage =
+            marksValidation.message;
+
+
+        parseCommandDisplay(
+            text,
+            marksValidation.rule.ruleLabel
+        );
+
+
+        updateVoiceStatusCard();
+
+
+        showResponse({
+            message: marksValidation.message,
+            text: normalizeText(text)
+        });
+
+
+        showJSON({
+            updated: false,
+            valid: false,
+            column: marksValidation.column,
+            marks: marksValidation.value,
+            allowed_range: `${marksValidation.rule.min} - ${marksValidation.rule.max}`,
+            message: marksValidation.message
+        });
+
+
+        addAlert(
+            marksValidation.message,
+            "error"
+        );
+
+
+        showToast(
+            marksValidation.message,
+            "error"
+        );
+
+
+        playBeep(
+            3,
+            260
+        );
+
+
+        if (
+            listeningSessionActive &&
+            !commandRequestsStop
+        ) {
+
+            continuousListeningActive = true;
+            syncMicButtonState();
+            scheduleRecognitionRestart();
+
+        }
+
+
+        return;
+
+    }
+
+
     setTextSafe(
         voiceStatus,
         "Processing"
@@ -2761,6 +3041,23 @@ async function processVoiceText(text) {
 
         if (!commandError && (data.updated || data.updated_count > 0)) {
             updateLiveStudentMarks(data);
+
+            setTextSafe(
+                responseStatus,
+                MARKS_SUCCESS_MESSAGE
+            );
+
+            addAlert(
+                MARKS_SUCCESS_MESSAGE,
+                "success"
+            );
+
+            showToast(
+                MARKS_SUCCESS_MESSAGE,
+                "success"
+            );
+
+            await refreshDatabaseDashboard();
         }
 
 
@@ -3027,6 +3324,8 @@ async function startContinuousMode() {
         continuousListeningActive =
             false;
 
+        localStorage.removeItem(microphonePersistenceKey);
+
 
         stopListeningAnimation();
 
@@ -3040,6 +3339,8 @@ async function startContinuousMode() {
         return;
 
     }
+
+    localStorage.setItem(microphonePersistenceKey, "true");
 
 
     recognition.onresult =
@@ -3186,6 +3487,8 @@ function stopContinuousMode() {
 
     continuousListeningActive =
         false;
+
+    localStorage.removeItem(microphonePersistenceKey);
 
     stopLocalVoiceFallback();
 
@@ -3455,14 +3758,22 @@ async function initializeDashboard() {
     updateVoiceStatusCard();
 
 
-    await Promise.all([
-        getHealthStatus(),
-        refreshDatabaseDashboard(),
-    ]);
-
+    // Render the dashboard as soon as the subject is known; secondary data can load behind it.
+    refreshDatabaseDashboard(false).catch(error => {
+        console.error("Dashboard data loading error:", error);
+    });
+    getHealthStatus().catch(error => {
+        console.error("Backend health loading error:", error);
+    });
     loadSheets().catch(error => {
         console.error("Sheet records loading error:", error);
     });
+
+    if (localStorage.getItem(microphonePersistenceKey) === "true") {
+        startContinuousMode().catch(error => {
+            console.error("Microphone restore error:", error);
+        });
+    }
 
 
     if (ENABLE_AUTO_REFRESH) {
@@ -3542,15 +3853,6 @@ sidebarLinks.forEach(
 micBtn?.addEventListener(
     "click",
     () => {
-
-        if (
-            continuousListeningActive
-        ) {
-            return;
-
-        }
-
-
         listenVoice();
 
     }
@@ -3618,6 +3920,126 @@ excelFileInput?.addEventListener(
     "change",
     handleExcelUpload
 );
+
+
+/* ==========================================================
+   MANUAL TABLE EDIT VALIDATION
+   Same rules are applied when marks are typed
+   directly inside the table.
+========================================================== */
+
+studentTable?.addEventListener(
+    "focusin",
+    event => {
+
+        const cell =
+            event.target?.closest?.(
+                "td.mark-cell[data-field]"
+            );
+
+        if (cell) {
+            cell.dataset.previousValue =
+                cell.textContent.trim();
+        }
+
+    }
+);
+
+
+studentTable?.addEventListener(
+    "focusout",
+    event => {
+
+        const cell =
+            event.target?.closest?.(
+                "td.mark-cell[data-field]"
+            );
+
+        if (!cell) {
+            return;
+        }
+
+
+        const enteredValue =
+            cell.textContent.trim();
+
+
+        const previousValue =
+            cell.dataset.previousValue ?? "0";
+
+
+        if (enteredValue === previousValue) {
+            return;
+        }
+
+
+        const result =
+            validateMarksValue(
+                cell.dataset.field,
+                enteredValue
+            );
+
+
+        if (!result.valid) {
+
+            cell.textContent = previousValue;
+
+            recalculateRowTotal(cell.closest("tr"));
+
+            warningMessage = result.message;
+
+            setTextSafe(
+                responseStatus,
+                result.message
+            );
+
+            updateVoiceStatusCard();
+
+            addAlert(
+                result.message,
+                "error"
+            );
+
+            showToast(
+                result.message,
+                "error"
+            );
+
+            playBeep(
+                3,
+                260
+            );
+
+            return;
+
+        }
+
+
+        cell.textContent = String(result.value);
+
+        cell.dataset.previousValue = cell.textContent;
+
+        recalculateRowTotal(cell.closest("tr"));
+
+        lastUpdatedMarksText = String(result.value);
+
+        warningMessage = "No warnings";
+
+        setTextSafe(
+            responseStatus,
+            MARKS_SUCCESS_MESSAGE
+        );
+
+        updateVoiceStatusCard();
+
+        showToast(
+            MARKS_SUCCESS_MESSAGE,
+            "success"
+        );
+
+    }
+);
+
 
 
 studentTableHeadRow?.addEventListener(

@@ -131,7 +131,7 @@ def test_voice_command_splits_back_to_back_roll_entries(monkeypatch):
     assert response["message"] == "Updated 2 marks entries."
 
 
-def test_voice_command_updates_row_wise_marks_for_one_roll(monkeypatch):
+def test_voice_command_updates_row_wise_marks_in_locked_column(monkeypatch):
     calls = []
 
     def fake_update_marks(roll_no, marks):
@@ -150,10 +150,58 @@ def test_voice_command_updates_row_wise_marks_for_one_roll(monkeypatch):
 
     assert response["updated_count"] == 3
     assert calls == [
-        ("assignment", 1, 8),
-        ("midterm", 1, 25),
+        ("final", 1, 8),
+        ("final", 1, 25),
         ("final", 1, 35),
     ]
+
+
+def test_locked_column_overrides_explicit_columns_in_voice_command(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(routes, "get_current_column", lambda: "assignment")
+    monkeypatch.setattr(routes, "set_current_column", lambda column: calls.append(("selected", column)))
+    monkeypatch.setattr(
+        routes,
+        "update_marks",
+        lambda roll_no, marks: calls.append(("updated", routes.get_current_column(), roll_no, marks))
+        or (True, "Marks Updated Successfully."),
+    )
+
+    response = routes.voice_command(
+        SimpleNamespace(text="roll number 1 assignment 3 midterm 4 final 5")
+    )
+
+    assert response["updated_count"] == 3
+    assert [call[1:] for call in calls if call[0] == "updated"] == [
+        ("assignment", 1, 3),
+        ("assignment", 1, 4),
+        ("assignment", 1, 5),
+    ]
+    assert [call for call in calls if call[0] == "selected"] == [
+        ("selected", "assignment"),
+    ]
+
+
+def test_locked_column_overrides_explicit_column_for_single_entry(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(routes, "get_current_column", lambda: "assignment")
+    monkeypatch.setattr(
+        routes,
+        "update_marks",
+        lambda roll_no, marks: calls.append((roll_no, marks))
+        or (True, "Marks Updated Successfully."),
+    )
+
+    response = routes.voice_command(
+        SimpleNamespace(text="midterm roll number 1 marks 4")
+    )
+
+    assert response["updated"] is True
+    assert response["selected_column"] == "assignment"
+    assert response["results"][0]["column"] == "assignment"
+    assert calls == [(1, 4)]
 
 
 def test_voice_command_understands_spoken_number_words(monkeypatch):
