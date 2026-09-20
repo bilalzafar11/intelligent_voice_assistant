@@ -42,15 +42,22 @@
 
         <div class="welcome">
 
-            <h2>
-                Welcome,
-                <span id="welcomeName">Teacher</span>
-                👋
-            </h2>
+            <div class="welcome-icon">
+                <i class="fa-solid fa-graduation-cap"></i>
+            </div>
 
-            <p>
-                Select a subject to manage students and marks.
-            </p>
+            <div class="welcome-copy">
+
+                <h2>
+                    Welcome,
+                    <span id="welcomeName">Teacher</span>
+                </h2>
+
+                <p>
+                    Select a subject to manage students and marks.
+                </p>
+
+            </div>
 
         </div>
 
@@ -145,6 +152,7 @@
 
                     container.innerHTML = `
                         <p class="error">
+                            <i class="fa-solid fa-circle-exclamation"></i>
                             ${data.message || "Unable to load subjects."}
                         </p>
                     `;
@@ -165,6 +173,7 @@
 
                     container.innerHTML = `
                         <p class="error">
+                            <i class="fa-solid fa-circle-exclamation"></i>
                             No subjects assigned to you.
                         </p>
                     `;
@@ -197,28 +206,33 @@
                     card.innerHTML = `
 
                         <div class="subject-icon">
-                            📚
+                            <i class="fa-solid fa-book-open"></i>
                         </div>
 
                         <h3>
                             ${subject.subject_name}
                         </h3>
 
-                        <p>
-                            <strong>Academic Year:</strong>
-                            ${subject.year}
-                        </p>
+                        <div class="subject-meta">
 
-                        <p>
-                            <strong>Semester:</strong>
-                            ${subject.semester}
-                        </p>
+                            <div>
+                                <span><i class="fa-solid fa-calendar-days"></i> Academic Year</span>
+                                <strong>${subject.year}</strong>
+                            </div>
+
+                            <div>
+                                <span><i class="fa-solid fa-layer-group"></i> Semester</span>
+                                <strong>${subject.semester}</strong>
+                            </div>
+
+                        </div>
 
                         <button
                             class="open-subject-btn"
                             data-subject-id="${subject.id}"
                         >
                             Open Subject
+                            <i class="fa-solid fa-arrow-right"></i>
                         </button>
 
                     `;
@@ -252,6 +266,7 @@
 
                 container.innerHTML = `
                     <p class="error">
+                        <i class="fa-solid fa-circle-exclamation"></i>
                         Cannot connect to server.
                         Please make sure the FastAPI server is running.
                     </p>

@@ -6,6 +6,36 @@
 
 const API_URL = "http://127.0.0.1:8000";
 
+
+/* ==========================================================
+   AUTH TOKEN HELPERS
+   The backend issues a token at login; protected endpoints
+   require it as a Bearer token on every request.
+========================================================== */
+
+function getAuthToken() {
+
+    return localStorage.getItem("teacherAuthToken") || "";
+
+}
+
+
+function getAuthHeaders(extraHeaders = {}) {
+
+    const token = getAuthToken();
+
+    return {
+        ...extraHeaders,
+        ...(token
+            ? {
+                "Authorization": `Bearer ${token}`
+            }
+            : {})
+    };
+
+}
+
+
 const ENABLE_AUTO_REFRESH = false;
 const ENABLE_HEALTH_POLLING = false;
 const AUTO_REFRESH_MS = 30000;
@@ -143,6 +173,38 @@ let lastUpdatedMarksText = "--";
 let warningMessage = "No warnings";
 
 let stopCommandHandled = false;
+
+
+/* ==========================================================
+   BACKGROUND NOISE MONITORING STATE
+   Informational only: noise level NEVER blocks or cancels a
+   voice command, marks update, Excel update, or column
+   selection. See startNoiseMonitoring()/stopNoiseMonitoring().
+========================================================== */
+
+let noiseMonitorStream = null;
+let noiseMonitorContext = null;
+let noiseMonitorSource = null;
+let noiseMonitorAnalyser = null;
+let noiseMonitorDataArray = null;
+let noiseMonitorFrameId = null;
+let noiseMonitoringActive = false;
+
+// "low" | "medium" | "high" -- updated continuously while monitoring.
+let currentNoiseLevel = "low";
+
+// RMS thresholds (0 - 1 range from 8-bit time-domain samples).
+// Tuned for typical laptop/USB mics in a classroom; adjust if the
+// deployment environment is consistently louder/quieter.
+const NOISE_RMS_MEDIUM_THRESHOLD = 0.04;
+const NOISE_RMS_HIGH_THRESHOLD = 0.09;
+
+const NOISE_MEDIUM_MESSAGE =
+    "Background noise detected, but your voice command is clear.";
+
+const NOISE_HIGH_MESSAGE =
+    "High background noise detected. Please speak clearly.";
+
 
 const lockableTableColumns = new Set([
     "quiz",
@@ -2518,6 +2580,189 @@ function playBeep(
 
 
 /* ==========================================================
+   BACKGROUND NOISE MONITORING
+   Runs alongside SpeechRecognition (not instead of it) using a
+   dedicated getUserMedia audio stream + Web Audio API analyser,
+   since SpeechRecognition never exposes raw microphone audio to
+   the page. Purely informational: it only ever sets a toast /
+   header warning, it never touches the voice-command flow.
+========================================================== */
+
+function classifyNoiseLevel(rms) {
+
+    if (rms >= NOISE_RMS_HIGH_THRESHOLD) {
+        return "high";
+    }
+
+    if (rms >= NOISE_RMS_MEDIUM_THRESHOLD) {
+        return "medium";
+    }
+
+    return "low";
+
+}
+
+
+function sampleNoiseLevel() {
+
+    if (
+        !noiseMonitoringActive ||
+        !noiseMonitorAnalyser ||
+        !noiseMonitorDataArray
+    ) {
+        return;
+    }
+
+    noiseMonitorAnalyser.getByteTimeDomainData(
+        noiseMonitorDataArray
+    );
+
+    let sumSquares = 0;
+
+    for (
+        let index = 0;
+        index < noiseMonitorDataArray.length;
+        index += 1
+    ) {
+
+        const normalizedSample =
+            (noiseMonitorDataArray[index] - 128) / 128;
+
+        sumSquares += normalizedSample * normalizedSample;
+
+    }
+
+    const rms =
+        Math.sqrt(sumSquares / noiseMonitorDataArray.length);
+
+    currentNoiseLevel = classifyNoiseLevel(rms);
+
+    noiseMonitorFrameId =
+        requestAnimationFrame(sampleNoiseLevel);
+
+}
+
+
+async function startNoiseMonitoring() {
+
+    if (noiseMonitoringActive) {
+        return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+        return;
+    }
+
+    const AudioCtor =
+        window.AudioContext ||
+        window.webkitAudioContext;
+
+    if (!AudioCtor) {
+        return;
+    }
+
+    try {
+
+        noiseMonitorStream =
+            await navigator.mediaDevices.getUserMedia({
+                audio: true
+            });
+
+        noiseMonitorContext = new AudioCtor();
+
+        noiseMonitorSource =
+            noiseMonitorContext.createMediaStreamSource(
+                noiseMonitorStream
+            );
+
+        noiseMonitorAnalyser =
+            noiseMonitorContext.createAnalyser();
+
+        noiseMonitorAnalyser.fftSize = 512;
+
+        noiseMonitorDataArray =
+            new Uint8Array(
+                noiseMonitorAnalyser.fftSize
+            );
+
+        noiseMonitorSource.connect(
+            noiseMonitorAnalyser
+        );
+
+        noiseMonitoringActive = true;
+        currentNoiseLevel = "low";
+
+        noiseMonitorFrameId =
+            requestAnimationFrame(sampleNoiseLevel);
+
+    } catch (error) {
+
+        // Microphone unavailable/denied for noise monitoring.
+        // Voice commands must keep working without it, so this
+        // fails silently rather than surfacing an alert.
+        console.warn(
+            "Noise monitoring unavailable:",
+            error
+        );
+
+        stopNoiseMonitoring();
+
+    }
+
+}
+
+
+function stopNoiseMonitoring() {
+
+    noiseMonitoringActive = false;
+    currentNoiseLevel = "low";
+
+    if (noiseMonitorFrameId) {
+        cancelAnimationFrame(noiseMonitorFrameId);
+        noiseMonitorFrameId = null;
+    }
+
+    if (noiseMonitorSource) {
+
+        try {
+            noiseMonitorSource.disconnect();
+        } catch (error) {
+            // Already disconnected.
+        }
+
+        noiseMonitorSource = null;
+
+    }
+
+    noiseMonitorAnalyser = null;
+    noiseMonitorDataArray = null;
+
+    if (noiseMonitorStream) {
+
+        noiseMonitorStream
+            .getTracks()
+            .forEach(track => track.stop());
+
+        noiseMonitorStream = null;
+
+    }
+
+    if (noiseMonitorContext) {
+
+        try {
+            noiseMonitorContext.close();
+        } catch (error) {
+            // Already closed.
+        }
+
+        noiseMonitorContext = null;
+
+    }
+
+}
+
+
+/* ==========================================================
    SPEECH RECOGNITION
 ========================================================== */
 
@@ -2811,6 +3056,39 @@ async function processVoiceText(text) {
 
 
     /* ==================================================
+       BACKGROUND NOISE CHECK (informational only)
+       Snapshot the level once per command so it reflects the
+       ambient noise while this utterance was captured. This
+       never blocks, delays or cancels command processing.
+    ================================================== */
+
+    const noiseLevelAtCapture =
+        currentNoiseLevel;
+
+
+    if (noiseLevelAtCapture === "medium") {
+
+        showToast(
+            NOISE_MEDIUM_MESSAGE,
+            "warning"
+        );
+
+    } else if (noiseLevelAtCapture === "high") {
+
+        warningMessage =
+            NOISE_HIGH_MESSAGE;
+
+        updateVoiceStatusCard();
+
+        showToast(
+            NOISE_HIGH_MESSAGE,
+            "warning"
+        );
+
+    }
+
+
+    /* ==================================================
        LOCAL MARKS VALIDATION
        Invalid marks are rejected here and never
        reach the backend.
@@ -2931,10 +3209,10 @@ async function processVoiceText(text) {
                 {
                     method: "POST",
 
-                    headers: {
+                    headers: getAuthHeaders({
                         "Content-Type":
                             "application/json"
-                    },
+                    }),
 
                     body: JSON.stringify({
                         text
@@ -2985,7 +3263,9 @@ async function processVoiceText(text) {
                 ?.toLowerCase()
                 .includes("warning")
                 ? data.message
-                : "No warnings";
+                : noiseLevelAtCapture === "high"
+                    ? NOISE_HIGH_MESSAGE
+                    : "No warnings";
 
 
         parseCommandDisplay(
@@ -3295,6 +3575,12 @@ async function startContinuousMode() {
         false;
 
 
+    // Fire-and-forget: noise monitoring must never delay or block
+    // speech recognition startup, and failures are handled inside
+    // startNoiseMonitoring() itself.
+    startNoiseMonitoring();
+
+
     warningMessage =
         "No warnings";
 
@@ -3490,6 +3776,8 @@ function stopContinuousMode() {
 
     localStorage.removeItem(microphonePersistenceKey);
 
+    stopNoiseMonitoring();
+
     stopLocalVoiceFallback();
 
     if (recognitionRestartTimer) {
@@ -3632,6 +3920,11 @@ function logoutTeacher() {
 
     localStorage.removeItem(
         "teacher"
+    );
+
+
+    localStorage.removeItem(
+        "teacherAuthToken"
     );
 
 
