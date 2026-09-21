@@ -84,3 +84,13 @@ class MarksSheet(Base):
 
     teacher = relationship("Teacher")
     subject = relationship("Subject")
+
+
+class HOD(Base):
+    __tablename__ = "hods"
+
+    id = Column(Integer, primary_key=True, index=True)
+    hod_id = Column(String, unique=True, nullable=False)
+    name = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=False)
+    password = Column(String, nullable=False)

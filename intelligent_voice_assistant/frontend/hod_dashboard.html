@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>HOD Dashboard | Intelligent Voice Assistant</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="hod_dashboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+
+<body>
+
+    <!-- =====================================================
+         SIDEBAR
+    ====================================================== -->
+
+    <aside class="sidebar" id="sidebar">
+
+        <div class="sidebar-top">
+
+            <div class="brand">
+
+                <div class="brand-icon">
+                    <i class="fa-solid fa-microphone-lines"></i>
+                </div>
+
+                <div class="brand-copy">
+                    <h2>
+                        INTELLIGENT
+                        <br>
+                        VOICE ASSISTANT
+                    </h2>
+                    <span>HOD Console</span>
+                </div>
+
+            </div>
+
+            <div class="sidebar-divider"></div>
+
+            <nav class="navigation">
+
+                <button class="nav-item active">
+                    <i class="fa-solid fa-gauge-high"></i>
+                    <span>Dashboard</span>
+                </button>
+
+                <button class="nav-item" id="refreshNavBtn">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>Refresh Data</span>
+                </button>
+
+            </nav>
+
+        </div>
+
+
+        <div class="sidebar-bottom">
+
+            <div class="system-status">
+
+                <span class="status-dot"></span>
+
+                <div>
+                    <strong>System Online</strong>
+                    <small>Marks Management</small>
+                </div>
+
+            </div>
+
+            <button class="logout-btn" id="logoutBtn">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                Logout
+            </button>
+
+        </div>
+
+    </aside>
+
+
+    <!-- Mobile Sidebar Overlay -->
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+
+    <!-- =====================================================
+         MAIN CONTENT
+    ====================================================== -->
+
+    <main class="main-content">
+
+        <!-- TOP HEADER -->
+
+        <header class="topbar">
+
+            <div class="topbar-left">
+
+                <button
+                    class="menu-toggle"
+                    id="sidebarToggle"
+                    aria-label="Toggle menu">
+
+                    <i class="fa-solid fa-bars"></i>
+
+                </button>
+
+                <div class="page-heading">
+
+                    <span class="eyebrow">Administration</span>
+
+                    <h1>HOD Dashboard</h1>
+
+                    <p>
+                        Monitor teachers, subjects and final marks
+                        sheet submission status.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="profile-area">
+
+                <div class="profile-text">
+                    <strong id="hodName">HOD</strong>
+                    <span>Head of Department</span>
+                </div>
+
+                <div class="profile-avatar" id="hodAvatar">
+                    H
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <!-- =================================================
+             STAT CARDS
+        ================================================== -->
+
+        <section class="stats-grid">
+
+            <div class="stat-card">
+
+                <div class="stat-icon">
+                    <i class="fa-solid fa-chalkboard-user"></i>
+                </div>
+
+                <div>
+                    <span>Total Teachers</span>
+                    <strong id="totalTeachers">0</strong>
+                </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <div class="stat-icon">
+                    <i class="fa-solid fa-book-open"></i>
+                </div>
+
+                <div>
+                    <span>Total Subjects</span>
+                    <strong id="totalSubjects">0</strong>
+                </div>
+
+            </div>
+
+
+            <div class="stat-card completed-card">
+
+                <div class="stat-icon">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+
+                <div>
+                    <span>Final Sheets Done</span>
+                    <strong id="completedSheets">0</strong>
+                </div>
+
+            </div>
+
+
+            <div class="stat-card pending-card">
+
+                <div class="stat-icon">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+
+                <div>
+                    <span>Pending Sheets</span>
+                    <strong id="pendingSheets">0</strong>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             DASHBOARD PANEL
+        ================================================== -->
+
+        <section class="dashboard-panel">
+
+            <div class="panel-header">
+
+                <div>
+
+                    <span class="section-label">
+                        Submission Monitor
+                    </span>
+
+                    <h2>Teacher Final Sheet Status</h2>
+
+                    <p>
+                        View the final submission status for every
+                        teacher and subject.
+                    </p>
+
+                </div>
+
+
+                <button class="refresh-btn" id="refreshBtn">
+                    <i class="fa-solid fa-rotate" id="refreshIcon"></i>
+                    Refresh
+                </button>
+
+            </div>
+
+
+            <!-- TABLE -->
+
+            <div class="table-wrapper">
+
+                <table>
+
+                    <thead>
+
+                        <tr>
+                            <th>Teacher</th>
+                            <th>Subject</th>
+                            <th>Semester</th>
+                            <th>Year</th>
+                            <th>Final Sheet</th>
+                            <th>Last Updated</th>
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="dashboardTableBody">
+
+                        <tr class="loading-row">
+
+                            <td colspan="6">
+
+                                <div class="loading">
+                                    <div class="spinner"></div>
+                                    Loading dashboard data...
+                                </div>
+
+                            </td>
+
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+
+            <!-- EMPTY STATE -->
+
+            <div class="empty-state" id="emptyState">
+
+                <div class="empty-icon">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                </div>
+
+                <h3>No Submission Data</h3>
+
+                <p>
+                    No teacher subjects are currently available.
+                </p>
+
+            </div>
+
+        </section>
+
+
+        <!-- FOOTER -->
+
+        <footer>
+
+            <span>Intelligent Voice Assistant</span>
+            <span>Student Marks Automation</span>
+
+        </footer>
+
+    </main>
+
+
+    <script src="hod_dashboard.js"></script>
+
+    <script>
+
+        const sidebar =
+            document.getElementById("sidebar");
+
+        const sidebarToggle =
+            document.getElementById("sidebarToggle");
+
+        const sidebarOverlay =
+            document.getElementById("sidebarOverlay");
+
+        function toggleSidebar() {
+
+            sidebar.classList.toggle("active");
+            sidebarOverlay.classList.toggle("active");
+
+        }
+
+        sidebarToggle?.addEventListener("click", toggleSidebar);
+        sidebarOverlay?.addEventListener("click", toggleSidebar);
+
+    </script>
+
+</body>
+
+</html>

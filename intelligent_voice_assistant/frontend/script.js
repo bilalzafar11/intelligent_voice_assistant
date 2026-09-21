@@ -123,7 +123,21 @@ const deleteSheetsList = document.getElementById("deleteSheetsList");
 const savedSheetCount = document.getElementById("savedSheetCount");
 const draftSheetCount = document.getElementById("draftSheetCount");
 const sheetTabs = document.querySelectorAll(".sheet-tab");
-let currentSheetId = null;
+let currentSheetStatus = "draft";
+let autoSaveTimer = null;
+let autoSaveInProgress = false;
+let autoSavePending = false;
+let currentSheetName = "";
+
+/*
+ * Gmail-style Draft <-> Saved Sheet guard.
+ * While the teacher's final "Save Sheet" click is in flight,
+ * no background Draft auto-save is allowed to run — otherwise
+ * a pending auto-save could race the final save and flip a
+ * just-completed Saved Sheet back into a Draft, or create a
+ * duplicate record.
+ */
+let sheetFinalizing = false;
 
 
 /* ==========================================================
@@ -658,32 +672,351 @@ async function loadSheets() {
     if (deleteSheetsList) deleteSheetsList.innerHTML = sheets.map(sheet => item(sheet, true)).join("") || empty;
 }
 
-async function saveCurrentSheet(status) {
-    if (!currentTeacher?.id || !selectedSubjectId) return;
-    const defaultName = `${currentSubject?.subject_name || "Subject"} - ${status === "draft" ? "Draft" : "Final"}`;
-    const name = window.prompt("Sheet name:", defaultName);
-    if (name === null) return;
-    const response = await fetch(`${API_URL}/sheets`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teacher_id: currentTeacher.id, subject_id: Number(selectedSubjectId), sheet_id: currentSheetId, name, status, rows: getEditableTableRows() })
-    });
+async function saveCurrentSheet(status, options = {}) {
+
+    if (!currentTeacher?.id || !selectedSubjectId) {
+        return;
+    }
+
+    const {
+        askName = true,
+        silent = false
+    } = options;
+
+    let name =
+        currentSheetName ||
+        `${currentSubject?.subject_name || "Subject"} - ${
+            status === "draft" ? "Draft" : "Completed"
+        }`;
+
+    /*
+     * Only ask for a name when the teacher is manually
+     * saving a new sheet.
+     *
+     * Auto-save never shows a popup.
+     */
+    if (askName) {
+
+        const enteredName =
+            window.prompt("Sheet name:", name);
+
+        if (enteredName === null) {
+            return;
+        }
+
+        name =
+            enteredName.trim() || name;
+
+    }
+
+    currentSheetName = name;
+
+    const payload = {
+        teacher_id: currentTeacher.id,
+        subject_id: Number(selectedSubjectId),
+        sheet_id: currentSheetId,
+        name: currentSheetName,
+        status: status,
+        rows: getEditableTableRows()
+    };
+
+    const response = await fetch(
+        `${API_URL}/sheets`,
+        {
+            method: "POST",
+
+            headers: getAuthHeaders({
+                "Content-Type": "application/json"
+            }),
+
+            body: JSON.stringify(payload)
+        }
+    );
+
     const data = await response.json();
-    if (!response.ok || !data.success) throw new Error(data.detail || "Unable to save sheet.");
-    currentSheetId = data.sheet.id;
-    showToast(status === "draft" ? "Draft saved." : "Sheet saved.", "success");
+
+    if (!response.ok || !data.success) {
+
+        throw new Error(
+            data.detail ||
+            data.message ||
+            "Unable to save sheet."
+        );
+
+    }
+
+    currentSheetId =
+        data.sheet.id;
+
+    /*
+     * Race guard: a "draft" save that was already in flight
+     * should never overwrite currentSheetStatus back to "draft"
+     * once the sheet has been (or is being) finalized as
+     * "saved" — otherwise, whichever request happens to
+     * resolve last would decide the status instead of the
+     * teacher's actual final "Save Sheet" click.
+     */
+    if (
+        status === "draft" &&
+        (sheetFinalizing || currentSheetStatus === "saved")
+    ) {
+        // Keep whatever status the final save already set.
+    } else {
+
+        currentSheetStatus =
+            data.sheet.status || status;
+
+    }
+
+    if (!silent) {
+
+        showToast(
+            status === "draft"
+                ? "Draft saved."
+                : "Sheet completed and saved.",
+            "success"
+        );
+
+    }
+
     await loadSheets();
+
+    return data.sheet;
 }
 
-async function openSheet(sheetId) {
-    const response = await fetch(`${API_URL}/sheets/${currentTeacher.id}?subject_id=${selectedSubjectId}`);
-    const data = await response.json();
-    const sheet = (data.sheets || []).find(item => item.id === Number(sheetId));
-    if (!sheet) return;
-    currentSheetId = sheet.id;
-    renderDatabaseStudents(sheet.rows || []);
-    showToast(`${sheet.name} loaded.`, "success");
+function scheduleDraftAutoSave() {
+
+    if (
+        !isTeacherLoggedIn() ||
+        !selectedSubjectId
+    ) {
+        return;
+    }
+
+    /*
+     * Completed sheet ko automatically Draft mein
+     * convert nahi karna.
+     */
+    if (currentSheetStatus === "saved") {
+        return;
+    }
+
+    /*
+     * Teacher abhi "Save Sheet" (final save) kar raha hai —
+     * is dauraan koi naya Draft auto-save schedule nahi karna.
+     */
+    if (sheetFinalizing) {
+        return;
+    }
+
+    if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+    }
+
+    autoSaveTimer = setTimeout(
+        () => {
+            autoSaveDraft();
+        },
+        1000
+    );
+
 }
+
+
+async function autoSaveDraft() {
+
+    if (
+        !isTeacherLoggedIn() ||
+        !selectedSubjectId
+    ) {
+        return;
+    }
+
+    if (currentSheetStatus === "saved") {
+        return;
+    }
+
+    /*
+     * Final "Save Sheet" click in progress — draft auto-save
+     * ko yahin rok do taake final save ke saath race na ho.
+     */
+    if (sheetFinalizing) {
+        return;
+    }
+
+    /*
+     * Agar already save ho raha hai to next change ko
+     * pending rakho.
+     */
+    if (autoSaveInProgress) {
+
+        autoSavePending = true;
+
+        return;
+
+    }
+
+    autoSaveInProgress = true;
+
+    try {
+
+        /*
+         * Lock milne ke baad dobara check: ho sakta hai
+         * ke wait karte karte teacher ne "Save Sheet"
+         * (final save) press kar diya ho.
+         */
+        if (sheetFinalizing || currentSheetStatus === "saved") {
+            return;
+        }
+
+        /*
+         * First automatic save:
+         * create a Draft record.
+         */
+        if (!currentSheetId) {
+
+            currentSheetName =
+                `${currentSubject?.subject_name || "Subject"} - Draft`;
+
+        }
+
+        await saveCurrentSheet(
+            "draft",
+            {
+                askName: false,
+                silent: true
+            }
+        );
+
+        /*
+         * Is request ke chalte chalte agar teacher ne final
+         * "Save Sheet" (sheetFinalizing) kar diya ho, to us
+         * naye "saved" status ko is purani Draft response se
+         * overwrite mat karo.
+         */
+        if (sheetFinalizing || currentSheetStatus === "saved") {
+            return;
+        }
+
+        currentSheetStatus = "draft";
+
+        setTextSafe(
+            responseStatus,
+            "Draft automatically saved."
+        );
+
+        setTextSafe(
+            voiceStatus,
+            "Draft Saved"
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Draft auto-save error:",
+            error
+        );
+
+        /*
+         * Auto-save failure should not stop the
+         * teacher from continuing work.
+         */
+        setTextSafe(
+            responseStatus,
+            "Draft auto-save failed."
+        );
+
+    } finally {
+
+        autoSaveInProgress = false;
+
+        if (autoSavePending) {
+
+            autoSavePending = false;
+
+            scheduleDraftAutoSave();
+
+        }
+
+    }
+
+}
+
+
+
+async function openSheet(sheetId) {
+
+    const response = await fetch(
+        `${API_URL}/sheets/${currentTeacher.id}?subject_id=${selectedSubjectId}`,
+        {
+            headers: getAuthHeaders()
+        }
+    );
+
+    const data =
+        await response.json();
+
+    const sheet =
+        (data.sheets || [])
+            .find(
+                item =>
+                    item.id === Number(sheetId)
+            );
+
+    if (!sheet) {
+        return;
+    }
+
+    currentSheetId =
+        sheet.id;
+
+    currentSheetStatus =
+        sheet.status || "draft";
+
+    currentSheetName =
+        sheet.name || "";
+
+    renderDatabaseStudents(
+        sheet.rows || []
+    );
+
+    /*
+     * Saved sheet = completed record.
+     * Draft = editable work in progress.
+     */
+    if (currentSheetStatus === "saved") {
+
+        showToast(
+            `${sheet.name} loaded as completed sheet.`,
+            "success"
+        );
+
+        setTextSafe(
+            responseStatus,
+            "Completed sheet loaded."
+        );
+
+    } else {
+
+        showToast(
+            `${sheet.name} loaded. Continue editing.`,
+            "success"
+        );
+
+        setTextSafe(
+            responseStatus,
+            "Draft loaded. Continue editing."
+        );
+
+        setTextSafe(
+            voiceStatus,
+            "Draft Editing"
+        );
+
+    }
+
+}
+
 
 async function deleteSavedSheet(sheetId) {
     if (!window.confirm("Delete this sheet permanently?")) return;
@@ -3338,7 +3671,12 @@ async function processVoiceText(text) {
             );
 
             await refreshDatabaseDashboard();
-        }
+
+            if (currentSheetStatus !== "saved") { 
+                scheduleDraftAutoSave();
+                }       
+            
+            }
 
 
         addAlert(
@@ -3963,7 +4301,18 @@ async function initializeDashboard() {
      * Load selected subject.
      */
 
+
     const subject = await loadSelectedSubject();
+
+    if (!subject) {
+
+        window.location.href = "teacher-dashboard.html";
+        return;
+    }
+
+currentSheetId = null;
+currentSheetStatus = "draft";
+currentSheetName = "";
 
     if (!subject) {
         window.location.href = "teacher-dashboard.html";
@@ -4161,8 +4510,100 @@ refreshBtn?.addEventListener(
     }
 );
 
-saveDraftBtn?.addEventListener("click", () => saveCurrentSheet("draft").catch(error => showToast(error.message, "error")));
-saveSheetBtn?.addEventListener("click", () => saveCurrentSheet("saved").catch(error => showToast(error.message, "error")));
+saveDraftBtn?.addEventListener(
+    "click",
+    () => {
+
+        saveCurrentSheet(
+            "draft",
+            {
+                askName: !currentSheetId,
+                silent: false
+            }
+        ).catch(
+            error =>
+                showToast(
+                    error.message,
+                    "error"
+                )
+        );
+
+    }
+);
+
+
+saveSheetBtn?.addEventListener(
+    "click",
+    async () => {
+
+        /*
+         * Gmail-style final save:
+         * - Turant koi bhi pending Draft auto-save cancel karo.
+         * - sheetFinalizing lagao taake is click ke poora hone
+         *   tak koi background Draft auto-save na chale
+         *   (warna woh race karke Saved sheet ko wapas Draft
+         *   bana sakta hai ya duplicate paida kar sakta hai).
+         * - Yeh wahi currentSheetId use karta hai, isliye
+         *   naya sheet nahi banta — usi Draft record ko
+         *   "saved" mein convert karta hai.
+         */
+        if (autoSaveTimer) {
+
+            clearTimeout(
+                autoSaveTimer
+            );
+
+            autoSaveTimer = null;
+
+        }
+
+        sheetFinalizing = true;
+
+        try {
+
+            const sheet =
+                await saveCurrentSheet(
+                    "saved",
+                    {
+                        askName: !currentSheetId,
+                        silent: false
+                    }
+                );
+
+            currentSheetStatus =
+                "saved";
+
+            setTextSafe(
+                voiceStatus,
+                "Completed"
+            );
+
+            setTextSafe(
+                responseStatus,
+                "Sheet completed successfully."
+            );
+
+            showToast(
+                "Sheet completed and saved.",
+                "success"
+            );
+
+        } catch (error) {
+
+            showToast(
+                error.message,
+                "error"
+            );
+
+        } finally {
+
+            sheetFinalizing = false;
+
+        }
+
+    }
+);
+
 
 [savedSheetsList, draftSheetsList, deleteSheetsList].forEach(list => {
     list?.addEventListener("click", event => {
@@ -4315,6 +4756,15 @@ studentTable?.addEventListener(
         recalculateRowTotal(cell.closest("tr"));
 
         lastUpdatedMarksText = String(result.value);
+
+        /*
+        * Gmail-style Draft auto-save.
+        * Every manual mark change schedules a Draft save.
+        */
+        if (currentSheetStatus !== "saved") {
+        scheduleDraftAutoSave();
+        }
+
 
         warningMessage = "No warnings";
 

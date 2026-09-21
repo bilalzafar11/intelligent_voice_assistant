@@ -1,5 +1,6 @@
+
 from database import SessionLocal
-from models import Subject, Teacher
+from models import HOD, Subject, Teacher
 
 
 TEACHERS = [
@@ -39,10 +40,21 @@ TEACHERS = [
 ]
 
 
+HODS = [
+    {
+        "hod_id": "H001",
+        "name": "Head of Department",
+        "email": "hod@example.com",
+        "password": "123456",
+    }
+]
+
+
 def seed_teachers_and_subjects():
     db = SessionLocal()
 
     try:
+        # Rebuild the seeded subject list while keeping existing teacher records.
         db.query(Subject).delete(synchronize_session=False)
 
         existing_teachers = {
@@ -54,12 +66,18 @@ def seed_teachers_and_subjects():
             teacher = existing_teachers.get(teacher_data["teacher_id"])
 
             if teacher is None:
-                teacher = Teacher(teacher_id=teacher_data["teacher_id"])
+                teacher = Teacher(
+                    teacher_id=teacher_data["teacher_id"],
+                    name=teacher_data["name"],
+                    email=teacher_data["email"],
+                    password=teacher_data["password"],
+                )
                 db.add(teacher)
+            else:
+                teacher.name = teacher_data["name"]
+                teacher.email = teacher_data["email"]
+                teacher.password = teacher_data["password"]
 
-            teacher.name = teacher_data["name"]
-            teacher.email = teacher_data["email"]
-            teacher.password = teacher_data["password"]
             db.flush()
 
             db.add_all(
@@ -75,12 +93,35 @@ def seed_teachers_and_subjects():
         valid_teacher_ids = {
             teacher_data["teacher_id"] for teacher_data in TEACHERS
         }
+
         for teacher_id, teacher in existing_teachers.items():
             if teacher_id not in valid_teacher_ids:
                 db.delete(teacher)
 
+        # Seed / update HOD records.
+        existing_hods = {
+            hod.hod_id: hod
+            for hod in db.query(HOD).all()
+        }
+
+        for hod_data in HODS:
+            hod = existing_hods.get(hod_data["hod_id"])
+
+            if hod is None:
+                hod = HOD(
+                    hod_id=hod_data["hod_id"],
+                    name=hod_data["name"],
+                    email=hod_data["email"],
+                    password=hod_data["password"],
+                )
+                db.add(hod)
+            else:
+                hod.name = hod_data["name"]
+                hod.email = hod_data["email"]
+                hod.password = hod_data["password"]
+
         db.commit()
-        print("Teachers and subjects seeded successfully.")
+        print("Teachers, subjects, and HOD data seeded successfully.")
 
     finally:
         db.close()

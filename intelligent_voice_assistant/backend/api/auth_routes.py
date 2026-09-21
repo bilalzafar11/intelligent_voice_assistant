@@ -10,7 +10,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from database import SessionLocal
-from models import Teacher, Subject, Student
+from models import HOD, Teacher, Subject, Student
+from backend.services.excel_service import read_students
 from backend.services.excel_service import read_students
 
 router = fastapi.APIRouter()
@@ -47,37 +48,73 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/login")
-def teacher_login(payload: LoginRequest):
+def common_login(payload: LoginRequest):
+    """
+    Common login endpoint for both Teacher and HOD.
+
+    Teacher:
+        returns role = "teacher" and teacher data.
+
+    HOD:
+        returns role = "hod" and HOD data.
+    """
+
     db = SessionLocal()
 
     try:
+        # =========================================================
+        # 1. CHECK HOD LOGIN
+        # =========================================================
+
+        hod = (
+            db.query(HOD)
+            .filter(HOD.email == payload.email)
+            .first()
+        )
+
+        if hod and hod.password == payload.password:
+            return {
+                "success": True,
+                "role": "hod",
+                "message": "HOD login successful.",
+                "hod": {
+                    "id": hod.id,
+                    "hod_id": hod.hod_id,
+                    "name": hod.name,
+                    "email": hod.email
+                }
+            }
+
+        # =========================================================
+        # 2. CHECK TEACHER LOGIN
+        # =========================================================
+
         teacher = (
             db.query(Teacher)
             .filter(Teacher.email == payload.email)
             .first()
         )
 
-        if not teacher:
+        if teacher and teacher.password == payload.password:
             return {
-                "success": False,
-                "message": "Invalid email or password."
+                "success": True,
+                "role": "teacher",
+                "message": "Login successful.",
+                "teacher": {
+                    "id": teacher.id,
+                    "teacher_id": teacher.teacher_id,
+                    "name": teacher.name,
+                    "email": teacher.email
+                }
             }
 
-        if teacher.password != payload.password:
-            return {
-                "success": False,
-                "message": "Invalid email or password."
-            }
+        # =========================================================
+        # 3. INVALID LOGIN
+        # =========================================================
 
         return {
-            "success": True,
-            "message": "Login successful.",
-            "teacher": {
-                "id": teacher.id,
-                "teacher_id": teacher.teacher_id,
-                "name": teacher.name,
-                "email": teacher.email
-            }
+            "success": False,
+            "message": "Invalid email or password."
         }
 
     finally:
